@@ -1,16 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
-	BarChart,
-	Bar,
-	XAxis,
-	YAxis,
-	CartesianGrid,
-	Tooltip,
-	Legend,
-	ResponsiveContainer,
-	Cell,
-} from "recharts";
-import {
 	Home,
 	BarChart2,
 	Wallet,
@@ -37,7 +26,21 @@ import {
 	Plane,
 	Users,
 	Lock,
+	Sun,
+	Moon,
+	Menu,
 } from "lucide-react";
+import {
+	BarChart,
+	Bar,
+	XAxis,
+	YAxis,
+	CartesianGrid,
+	Tooltip,
+	Legend,
+	ResponsiveContainer,
+	Cell,
+} from "recharts";
 
 // --- DEFAULT DATA & CONFIG ---
 const getStartOfMonth = (date = new Date()) =>
@@ -291,15 +294,32 @@ const useFinTrack = () => {
 };
 
 // --- UI COMPONENTS ---
-const Header = ({ onSettingsClick, notifications, onClearNotifications }) => {
+const Header = ({
+	onSettingsClick,
+	notifications,
+	onClearNotifications,
+	pageTitle,
+	onMenuClick,
+}) => {
 	const [panelOpen, setPanelOpen] = useState(false);
 	const unreadCount = notifications.filter((n) => !n.read).length;
 	return (
-		<header className="flex justify-between items-center p-4 bg-white dark:bg-gray-800 border-b dark:border-gray-700 sticky top-0 z-30 md:ml-64">
+		<header className="flex justify-between items-center p-4 bg-white dark:bg-gray-800 border-b dark:border-gray-700 sticky top-0 z-20">
 			{" "}
-			<h1 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white">
-				FinTrack
-			</h1>{" "}
+			<div className="flex items-center">
+				{" "}
+				<button
+					type="button"
+					onClick={onMenuClick}
+					className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 mr-2"
+				>
+					{" "}
+					<Menu className="h-6 w-6 text-gray-600 dark:text-gray-300" />{" "}
+				</button>{" "}
+				<h1 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white">
+					{pageTitle}
+				</h1>{" "}
+			</div>{" "}
 			<div className="flex items-center space-x-2 md:space-x-4">
 				{" "}
 				<div className="relative">
@@ -438,7 +458,13 @@ const BottomNav = ({ activeView, setActiveView }) => {
 		</div>
 	);
 };
-const Sidebar = ({ activeView, setActiveView }) => {
+const Sidebar = ({
+	activeView,
+	setActiveView,
+	isDrawerOpen,
+	setIsDrawerOpen,
+	autoHideMenu,
+}) => {
 	const navItems = [
 		{ name: "Dashboard", icon: Home, view: "dashboard" },
 		{ name: "Budgets", icon: BarChart2, view: "budgets" },
@@ -446,26 +472,40 @@ const Sidebar = ({ activeView, setActiveView }) => {
 		{ name: "Settings", icon: Settings, view: "settings" },
 	];
 	return (
-		<div className="hidden md:flex flex-col w-64 fixed inset-y-0 bg-white dark:bg-gray-800 border-r dark:border-gray-700 p-4">
+		<>
 			{" "}
-			<h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-8">
-				FinTrack
-			</h2>{" "}
-			<nav className="flex flex-col space-y-2">
+			<div
+				className={`fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-gray-800 border-r dark:border-gray-700 p-4 transform transition-transform duration-300 ease-in-out ${isDrawerOpen ? "translate-x-0" : "-translate-x-full"}`}
+			>
 				{" "}
-				{navItems.map((item) => (
-					<button
-						type="button"
-						key={item.name}
-						onClick={() => setActiveView(item.view)}
-						className={`flex items-center space-x-3 p-3 rounded-lg ${activeView === item.view ? "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300" : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"}`}
-					>
-						{" "}
-						<item.icon className="h-6 w-6" /> <span>{item.name}</span>{" "}
-					</button>
-				))}{" "}
-			</nav>{" "}
-		</div>
+				<h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-8">
+					FinTrack
+				</h2>{" "}
+				<nav className="flex flex-col space-y-2">
+					{" "}
+					{navItems.map((item) => (
+						<button
+							type="button"
+							key={item.name}
+							onClick={() => {
+								setActiveView(item.view);
+								if (autoHideMenu) setIsDrawerOpen(false);
+							}}
+							className={`flex items-center space-x-3 p-3 rounded-lg ${activeView === item.view ? "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300" : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"}`}
+						>
+							{" "}
+							<item.icon className="h-6 w-6" /> <span>{item.name}</span>{" "}
+						</button>
+					))}{" "}
+				</nav>{" "}
+			</div>{" "}
+			{isDrawerOpen && (
+				<div
+					onClick={() => setIsDrawerOpen(false)}
+					className="fixed inset-0 bg-black/30 z-30"
+				/>
+			)}{" "}
+		</>
 	);
 };
 const TransactionModal = ({
@@ -1636,26 +1676,112 @@ const BudgetCard = ({
 	);
 };
 
-const AccountsPage = ({ finTrackData }) => {
-	const { accounts, calculatedData } = finTrackData;
+const AccountItem = ({
+	account,
+	calculatedBalance,
+	transactions,
+	accountModalControls,
+}) => {
+	const { income, expenses } = useMemo(() => {
+		const now = new Date();
+		const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+		const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+		let income = 0;
+		let expenses = 0;
+
+		transactions
+			.filter(
+				(tx) =>
+					(tx.accountId === account.id ||
+						tx.to === account.id ||
+						tx.from === account.id) &&
+					new Date(tx.date) >= startOfMonth &&
+					new Date(tx.date) <= endOfMonth,
+			)
+			.forEach((tx) => {
+				if (tx.type === "income" && tx.accountId === account.id) {
+					income += tx.amount;
+				} else if (tx.type === "expense" && tx.accountId === account.id) {
+					expenses += tx.amount;
+				} else if (tx.type === "transfer") {
+					if (tx.to === account.id) income += tx.amount;
+					if (tx.from === account.id) expenses += tx.amount + (tx.fee || 0);
+				}
+			});
+
+		return { income, expenses };
+	}, [account.id, transactions]);
+
+	return (
+		<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200 first:rounded-t-xl last:rounded-b-xl">
+			<div className="mb-4 sm:mb-0">
+				<p className="font-semibold text-lg text-gray-800 dark:text-gray-100">
+					{account.name}
+				</p>
+				<p className="text-sm text-gray-500 dark:text-gray-400">
+					{account.type}
+				</p>
+			</div>
+			<div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 md:gap-8 w-full sm:w-auto">
+				<div className="text-left sm:text-right">
+					<p className="text-sm text-green-500">+${income.toFixed(2)}</p>
+					<p className="text-sm text-red-500">-${expenses.toFixed(2)}</p>
+					<p className="text-xs text-gray-400">This Month</p>
+				</div>
+				<div className="text-left sm:text-right">
+					<p className="text-xl font-bold text-gray-800 dark:text-gray-100">
+						${calculatedBalance.toFixed(2)}
+					</p>
+					<p className="text-xs text-gray-400">Current Balance</p>
+				</div>
+				<button
+					type="button"
+					onClick={() => accountModalControls.edit(account)}
+					className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full ml-auto sm:ml-0"
+				>
+					<Edit className="w-5 h-5 text-gray-500" />
+				</button>
+			</div>
+		</div>
+	);
+};
+
+const AccountsPage = ({ finTrackData, accountModalControls }) => {
+	const { accounts, calculatedData, transactions } = finTrackData;
 	return (
 		<div className="p-4 md:p-6 space-y-6">
 			{" "}
-			<h1 className="text-2xl font-bold text-gray-800 dark:text-white">
-				Your Accounts
-			</h1>{" "}
-			{accounts.map((account) => (
-				<Card key={account.id} className="flex justify-between items-center">
+			<div className="flex justify-between items-center mb-4">
+				{" "}
+				<h1 className="text-2xl font-bold text-gray-800 dark:text-white">
+					Your Accounts
+				</h1>{" "}
+				<button
+					type="button"
+					onClick={() => accountModalControls.open()}
+					className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
+				>
 					{" "}
-					<div>
-						<p className="font-semibold">{account.name}</p>
-						<p className="text-sm text-gray-500">{account.type}</p>
-					</div>{" "}
-					<p className="text-lg font-semibold">
-						${(calculatedData.accountBalances[account.id] || 0).toFixed(2)}
-					</p>{" "}
-				</Card>
-			))}{" "}
+					<Plus size={18} /> Add Account{" "}
+				</button>{" "}
+			</div>{" "}
+			<div className="bg-white dark:bg-gray-800 rounded-xl shadow-md">
+				{" "}
+				<div className="divide-y divide-gray-200 dark:divide-gray-700">
+					{" "}
+					{accounts.map((account) => (
+						<AccountItem
+							key={account.id}
+							account={account}
+							calculatedBalance={
+								calculatedData.accountBalances[account.id] || 0
+							}
+							transactions={transactions}
+							accountModalControls={accountModalControls}
+						/>
+					))}{" "}
+				</div>{" "}
+			</div>{" "}
 		</div>
 	);
 };
@@ -1663,6 +1789,10 @@ const SettingsPage = ({
 	finTrackData,
 	accountModalControls,
 	categoryModalControls,
+	darkMode,
+	setDarkMode,
+	autoHideMenu,
+	setAutoHideMenu,
 }) => {
 	const {
 		accounts,
@@ -1679,6 +1809,12 @@ const SettingsPage = ({
 			<h1 className="text-2xl font-bold text-gray-800 dark:text-white">
 				Settings
 			</h1>{" "}
+			<AppearanceSettings
+				darkMode={darkMode}
+				setDarkMode={setDarkMode}
+				autoHideMenu={autoHideMenu}
+				setAutoHideMenu={setAutoHideMenu}
+			/>{" "}
 			<AccountManagement
 				accounts={accounts}
 				accountModalControls={accountModalControls}
@@ -1835,6 +1971,57 @@ const DataManagement = ({
 		</Card>
 	);
 };
+const AppearanceSettings = ({
+	darkMode,
+	setDarkMode,
+	autoHideMenu,
+	setAutoHideMenu,
+}) => (
+	<Card>
+		{" "}
+		<h3 className="text-lg font-semibold mb-4">Appearance</h3>{" "}
+		<div className="flex items-center justify-between">
+			{" "}
+			<label
+				htmlFor="dark-mode-toggle"
+				className="text-gray-700 dark:text-gray-300"
+			>
+				Dark Mode
+			</label>{" "}
+			<button
+				type="button"
+				id="dark-mode-toggle"
+				onClick={() => setDarkMode(!darkMode)}
+				className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors ${darkMode ? "bg-indigo-600" : "bg-gray-200"}`}
+			>
+				{" "}
+				<span
+					className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform ${darkMode ? "translate-x-6" : "translate-x-1"}`}
+				/>{" "}
+			</button>{" "}
+		</div>{" "}
+		<div className="flex items-center justify-between mt-4">
+			{" "}
+			<label
+				htmlFor="auto-hide-toggle"
+				className="text-gray-700 dark:text-gray-300"
+			>
+				Auto-hide menu on click
+			</label>{" "}
+			<button
+				type="button"
+				id="auto-hide-toggle"
+				onClick={() => setAutoHideMenu(!autoHideMenu)}
+				className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors ${autoHideMenu ? "bg-indigo-600" : "bg-gray-200"}`}
+			>
+				{" "}
+				<span
+					className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform ${autoHideMenu ? "translate-x-6" : "translate-x-1"}`}
+				/>{" "}
+			</button>{" "}
+		</div>{" "}
+	</Card>
+);
 
 // --- MAIN APP COMPONENT ---
 export default function App() {
@@ -1858,6 +2045,20 @@ export default function App() {
 		open: false,
 		edit: null,
 	});
+	const [darkMode, setDarkMode] = useStickyState(false, "fintrack-dark-mode");
+	const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+	const [autoHideMenu, setAutoHideMenu] = useStickyState(
+		true,
+		"fintrack-autohide-menu",
+	);
+
+	useEffect(() => {
+		if (darkMode) {
+			document.documentElement.classList.add("dark");
+		} else {
+			document.documentElement.classList.remove("dark");
+		}
+	}, [darkMode]);
 
 	const handleSaveTx = (tx) => {
 		finTrackData.handleSaveTransaction(tx);
@@ -1947,6 +2148,10 @@ export default function App() {
 			budgetModalControls,
 			accountModalControls,
 			categoryModalControls,
+			darkMode,
+			setDarkMode,
+			autoHideMenu,
+			setAutoHideMenu,
 		};
 		switch (activeView) {
 			case "dashboard":
@@ -1964,13 +2169,21 @@ export default function App() {
 
 	return (
 		<div className="bg-gray-50 dark:bg-gray-900 min-h-screen font-sans text-gray-900 dark:text-gray-100">
-			<div className="flex">
-				<Sidebar activeView={activeView} setActiveView={setActiveView} />
-				<div className="flex-1 md:ml-64">
+			<div className="relative flex">
+				<Sidebar
+					activeView={activeView}
+					setActiveView={setActiveView}
+					isDrawerOpen={isDrawerOpen}
+					setIsDrawerOpen={setIsDrawerOpen}
+					autoHideMenu={autoHideMenu}
+				/>
+				<div className="flex-1 flex flex-col w-full">
 					<Header
 						onSettingsClick={() => setActiveView("settings")}
 						notifications={finTrackData.notifications}
 						onClearNotifications={() => finTrackData.setNotifications([])}
+						pageTitle={activeView.charAt(0).toUpperCase() + activeView.slice(1)}
+						onMenuClick={() => setIsDrawerOpen(!isDrawerOpen)}
 					/>
 					<main className="pb-20 md:pb-6">{renderActiveView()}</main>
 				</div>
