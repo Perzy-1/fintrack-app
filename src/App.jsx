@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 // import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@7/build/index.js'; // Removed static import
+import appIconUrl from "./assets/svgviewer-output.svg"; // Adjust path if needed
 import {
 	Home,
 	BarChart2,
@@ -3828,24 +3829,23 @@ export default function App() {
 
 	useEffect(() => {
 		const root = document.documentElement;
+
+		if (theme === "light") {
+			root.classList.remove("dark");
+			return;
+		}
+		if (theme === "dark") {
+			root.classList.add("dark");
+			return;
+		}
+
+		// If theme is 'system'
 		const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-
-		const applyTheme = () => {
-			if (theme === "system") {
-				root.classList.toggle("dark", mediaQuery.matches);
-			} else {
-				root.classList.toggle("dark", theme === "dark");
-			}
-		};
-
 		const handleSystemThemeChange = (e) => {
-			if (theme === "system") {
-				root.classList.toggle("dark", e.matches);
-			}
+			root.classList.toggle("dark", e.matches);
 		};
 
-		applyTheme();
-
+		handleSystemThemeChange(mediaQuery);
 		mediaQuery.addEventListener("change", handleSystemThemeChange);
 
 		return () => {
@@ -3860,35 +3860,10 @@ export default function App() {
 			short_name: "FinTrack",
 			start_url: ".",
 			display: "standalone",
-			background_color: "#111827", // Dark gray background
-			theme_color: "#4f46e5", // Indigo theme color
+			background_color: "#111827",
+			theme_color: "#4f46e5",
 			description: "A modern, offline-first personal finance tracker.",
-			icons: [
-				{
-					src: "https://placehold.co/192x192/4f46e5/ffffff?text=FT",
-					type: "image/png",
-					sizes: "192x192",
-					purpose: "any",
-				},
-				{
-					src: "https://placehold.co/512x512/4f46e5/ffffff?text=FT",
-					type: "image/png",
-					sizes: "512x512",
-					purpose: "any",
-				},
-				{
-					src: "https://placehold.co/192x192/4f46e5/ffffff?text=FT",
-					type: "image/png",
-					sizes: "192x192",
-					purpose: "maskable",
-				},
-				{
-					src: "https://placehold.co/512x512/4f46e5/ffffff?text=FT",
-					type: "image/png",
-					sizes: "512x512",
-					purpose: "maskable",
-				},
-			],
+			icons: [{ src: appIconUrl, type: "image/svg+xml", sizes: "any" }],
 		};
 		const manifestString = JSON.stringify(manifest);
 		const blob = new Blob([manifestString], { type: "application/json" });
@@ -3916,10 +3891,11 @@ export default function App() {
 		appleStatus.content = "black-translucent";
 		document.head.appendChild(appleStatus);
 
+		// Update the Apple Touch Icon
 		document.querySelector('link[rel="apple-touch-icon"]')?.remove();
 		const appleIcon = document.createElement("link");
 		appleIcon.rel = "apple-touch-icon";
-		appleIcon.href = "https://placehold.co/180x180/4f46e5/ffffff?text=FT";
+		appleIcon.href = appIconUrl; // Use the imported SVG
 		document.head.appendChild(appleIcon);
 	}, []);
 
