@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-// import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@7/build/index.js'; // Removed static import
+// Use dynamic import for idb library
 import {
 	Home,
 	BarChart2,
@@ -74,6 +74,8 @@ import {
 	Percent,
 	Delete,
 	Repeat,
+	Database,
+	Copy, // Added for duplicate budget feature
 } from "lucide-react";
 import {
 	BarChart,
@@ -89,7 +91,7 @@ import {
 
 // --- DATABASE & MIGRATION LOGIC ---
 const DB_NAME = "fintrack-db";
-const DB_VERSION = 2; // Bump version for new store
+const DB_VERSION = 2;
 const STORES = [
 	"accounts",
 	"transactions",
@@ -99,6 +101,7 @@ const STORES = [
 	"appSettings",
 ];
 
+// --- INITIAL & DEFAULT DATA ---
 const initialAccounts = [
 	{ id: "acc-1", name: "Main Checking", type: "Debit Card", balance: 4855 },
 	{ id: "acc-2", name: "Vacation Fund", type: "Savings", balance: 1200 },
@@ -121,6 +124,12 @@ const defaultCategories = {
 	},
 	special: {
 		"Balance Correction": {
+			icon: "PiggyBank",
+			color: "#64748B",
+			isProtected: true,
+			type: "icon",
+		},
+		"Balance Adjustment": {
 			icon: "PiggyBank",
 			color: "#64748B",
 			isProtected: true,
@@ -195,12 +204,11 @@ const initialData = {
 };
 
 const initDB = async () => {
-	// Use dynamic import to load the library only on the client-side.
 	const { openDB } = await import(
 		"https://cdn.jsdelivr.net/npm/idb@7/build/index.js"
 	);
-	const db = await openDB(DB_NAME, DB_VERSION, {
-		upgrade(db, oldVersion, newVersion, transaction) {
+	return openDB(DB_NAME, DB_VERSION, {
+		upgrade(db) {
 			STORES.forEach((storeName) => {
 				if (!db.objectStoreNames.contains(storeName)) {
 					db.createObjectStore(storeName, { keyPath: "id" });
@@ -208,10 +216,8 @@ const initDB = async () => {
 			});
 		},
 	});
-	return db;
 };
 
-// Data validation and cleaning function
 const validateAndCleanData = (loadedData) => {
 	const categories = {
 		...defaultCategories,
@@ -232,7 +238,7 @@ const validateAndCleanData = (loadedData) => {
 	return { ...loadedData, categories };
 };
 
-// --- DEFAULT DATA & CONFIG ---
+// --- DATE & FORMATTING HELPERS ---
 const getStartOfDay = (date = new Date()) => {
 	const d = new Date(date);
 	d.setHours(0, 0, 0, 0);
@@ -271,7 +277,7 @@ const formatRangeLabel = (period, date) => {
 				month: "long",
 				day: "numeric",
 			});
-		case "weekly":
+		case "weekly": {
 			const start = getStartOfWeek(date);
 			const end = getEndOfWeek(date);
 			const startMonth = start.toLocaleString("default", { month: "short" });
@@ -280,6 +286,7 @@ const formatRangeLabel = (period, date) => {
 				return `${startMonth} ${start.getDate()} - ${end.getDate()}, ${year}`;
 			}
 			return `${startMonth} ${start.getDate()} - ${endMonth} ${end.getDate()}, ${year}`;
+		}
 		case "monthly":
 			return `${monthName} ${year}`;
 		case "annually":
@@ -341,6 +348,8 @@ const iconMap = {
 	Coins,
 	Receipt,
 	Repeat,
+	Database,
+	Copy,
 };
 const initialNotifications = [];
 
@@ -378,90 +387,21 @@ const useStickyState = (defaultValue, key) => {
 	return [value, setValue];
 };
 
-const SlideableAction = ({ children, onEdit, onDelete }) => {
-	const [translateX, setTranslateX] = useState(0);
-	const touchStartX = useRef(0);
-	const initialTranslateX = useRef(0);
-	const itemRef = useRef(null);
-	const actionsWidth = 140;
-
-	const handleTouchStart = (e) => {
-		touchStartX.current = e.touches[0].clientX;
-		initialTranslateX.current = translateX;
-		if (itemRef.current) {
-			itemRef.current.style.transition = "none";
-		}
-	};
-	const handleTouchMove = (e) => {
-		const diff = e.touches[0].clientX - touchStartX.current;
-		setTranslateX(
-			Math.max(-actionsWidth, Math.min(0, initialTranslateX.current + diff)),
-		);
-	};
-	const handleTouchEnd = () => {
-		if (itemRef.current) {
-			itemRef.current.style.transition = "transform 0.3s ease";
-		}
-		if (translateX < -70) {
-			setTranslateX(-actionsWidth);
-		} else {
-			setTranslateX(0);
-		}
-	};
-	const handleActionAndClose = (actionFn) => {
-		actionFn();
-		setTranslateX(0);
-	};
-
-	return (
-		<div className="relative overflow-hidden">
-			{" "}
-			<div className="absolute top-0 right-0 h-full flex items-center">
-				{" "}
-				<button
-					onClick={() => handleActionAndClose(onEdit)}
-					className="bg-blue-500 text-white h-full px-4 flex items-center justify-center"
-				>
-					<Edit size={20} />
-				</button>{" "}
-				<button
-					onClick={() => handleActionAndClose(onDelete)}
-					className="bg-red-500 text-white h-full px-4 flex items-center justify-center"
-				>
-					<Trash2 size={20} />
-				</button>{" "}
-			</div>{" "}
-			<div
-				ref={itemRef}
-				className="relative bg-white dark:bg-gray-800 w-full"
-				onTouchStart={handleTouchStart}
-				onTouchMove={handleTouchMove}
-				onTouchEnd={handleTouchEnd}
-				style={{ transform: `translateX(${translateX}px)` }}
-			>
-				{children}
-			</div>{" "}
-		</div>
-	);
-};
-
 const ErrorBannerSystem = ({ errors, onClose }) => (
 	<div className="fixed top-4 left-1/2 -translate-x-1/2 w-full max-w-sm px-4 space-y-2 z-50">
-		{" "}
 		{errors.map((error) => (
 			<div
 				key={error.id}
 				className={`bg-red-500 text-white p-3 rounded-lg shadow-lg flex justify-between items-center animate-slide-in-fade-out`}
 			>
-				{" "}
 				<span>
 					{error.message} {error.count > 1 && `(${error.count})`}
-				</span>{" "}
+				</span>
 				<button onClick={() => onClose(error.id)}>
 					<X size={20} />
-				</button>{" "}
+				</button>
 			</div>
-		))}{" "}
+		))}
 	</div>
 );
 
@@ -506,9 +446,9 @@ const CalculatorKeypad = ({ onKeyPress, onDone, displayValue }) => {
 							type="button"
 							onClick={() => onKeyPress(keyConfig.value || keyConfig.label)}
 							className={`h-16 rounded-lg flex items-center justify-center text-2xl font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-colors
-                            ${isOperator ? "bg-indigo-500 text-white hover:bg-indigo-600" : ""}
-                            ${isNumber || isAction ? "bg-slate-700 text-white hover:bg-slate-600" : ""}
-                            `}
+                                ${isOperator ? "bg-indigo-500 text-white hover:bg-indigo-600" : ""}
+                                ${isNumber || isAction ? "bg-slate-700 text-white hover:bg-slate-600" : ""}
+                                `}
 						>
 							{keyConfig.icon ? <keyConfig.icon size={28} /> : keyConfig.label}
 						</button>
@@ -623,64 +563,64 @@ const useFinTrack = () => {
 	const [notifications, setNotifications] = useState(initialNotifications);
 	const [isDbLoading, setIsDbLoading] = useState(true);
 
-	// Load data from IndexedDB on initial mount
 	useEffect(() => {
 		const loadData = async () => {
 			setIsDbLoading(true);
-			const db = await initDB();
-			let hasData = false;
-
-			const accountsCount = await db.count("accounts");
-			if (accountsCount > 0) hasData = true;
-
-			if (hasData) {
-				const loadedData = {
-					accounts: await db.getAll("accounts"),
-					transactions: await db.getAll("transactions"),
-					budgets: await db.getAll("budgets"),
-					categories: (await db.get("categories", "main")) || defaultCategories,
-					recurringTransactions:
-						(await db.getAll("recurringTransactions")) || [],
-				};
-				const cleanedData = validateAndCleanData(loadedData);
-				setAccounts(cleanedData.accounts);
-				setTransactions(cleanedData.transactions);
-				setBudgets(cleanedData.budgets);
-				setCategories(cleanedData.categories);
-				setRecurringTransactions(cleanedData.recurringTransactions);
-			} else {
-				// DB is empty, populate with initial data
-				const tx = db.transaction(STORES, "readwrite");
-				await Promise.all([
-					...initialData.accounts.map((item) =>
-						tx.objectStore("accounts").put(item),
-					),
-					...initialData.transactions.map((item) =>
-						tx.objectStore("transactions").put(item),
-					),
-					...initialData.budgets.map((item) =>
-						tx.objectStore("budgets").put(item),
-					),
-					tx
-						.objectStore("categories")
-						.put({ id: "main", ...initialData.categories }),
-					...initialData.recurringTransactions.map((item) =>
-						tx.objectStore("recurringTransactions").put(item),
-					),
-				]);
-				await tx.done;
-				setAccounts(initialData.accounts);
-				setTransactions(initialData.transactions);
-				setBudgets(initialData.budgets);
-				setCategories(initialData.categories);
-				setRecurringTransactions(initialData.recurringTransactions);
+			try {
+				const db = await initDB();
+				const accountsCount = await db.count("accounts");
+				if (accountsCount > 0) {
+					const loadedData = {
+						accounts: await db.getAll("accounts"),
+						transactions: await db.getAll("transactions"),
+						budgets: await db.getAll("budgets"),
+						categories:
+							(await db.get("categories", "main")) || defaultCategories,
+						recurringTransactions:
+							(await db.getAll("recurringTransactions")) || [],
+					};
+					const cleanedData = validateAndCleanData(loadedData);
+					setAccounts(cleanedData.accounts);
+					setTransactions(cleanedData.transactions);
+					setBudgets(cleanedData.budgets);
+					setCategories(cleanedData.categories);
+					setRecurringTransactions(cleanedData.recurringTransactions);
+				} else {
+					const db = await initDB();
+					const tx = db.transaction(STORES, "readwrite");
+					await Promise.all([
+						...initialData.accounts.map((item) =>
+							tx.objectStore("accounts").put(item),
+						),
+						...initialData.transactions.map((item) =>
+							tx.objectStore("transactions").put(item),
+						),
+						...initialData.budgets.map((item) =>
+							tx.objectStore("budgets").put(item),
+						),
+						tx
+							.objectStore("categories")
+							.put({ id: "main", ...initialData.categories }),
+						...initialData.recurringTransactions.map((item) =>
+							tx.objectStore("recurringTransactions").put(item),
+						),
+					]);
+					await tx.done;
+					setAccounts(initialData.accounts);
+					setTransactions(initialData.transactions);
+					setBudgets(initialData.budgets);
+					setCategories(initialData.categories);
+					setRecurringTransactions(initialData.recurringTransactions);
+				}
+			} catch (error) {
+				console.error("Failed to load data from DB:", error);
+			} finally {
+				setIsDbLoading(false);
 			}
-			setIsDbLoading(false);
 		};
 		loadData();
 	}, []);
 
-	// Helper to update state and DB
 	const updateStateAndDB = async (storeName, data, setter) => {
 		setter(data);
 		const db = await initDB();
@@ -690,13 +630,11 @@ const useFinTrack = () => {
 		if (Array.isArray(data)) {
 			await Promise.all(data.map((item) => store.put(item)));
 		} else {
-			// Handle object-based stores like categories
 			await store.put({ id: "main", ...data });
 		}
 		await tx.done;
 	};
 
-	// Budget renewal logic
 	useEffect(() => {
 		if (isDbLoading) return;
 		const today = new Date();
@@ -721,40 +659,96 @@ const useFinTrack = () => {
 	const calculatedData = useMemo(() => {
 		const currentBalances = accounts.reduce((acc, account) => {
 			let balance = account.balance;
-			transactions.forEach((tx) => {
-				if (tx.accountId === account.id) {
-					if (tx.type === "income") balance += tx.amount;
-					else if (tx.type === "expense") balance -= tx.amount;
-				} else if (tx.type === "transfer") {
-					if (tx.from === account.id) balance -= tx.amount + (tx.fee || 0);
-					if (tx.to === account.id) balance += tx.amount;
-				}
-			});
+			// Note: This is a simplified balance calculation. For production,
+			// it's better to calculate balance from transactions against an initial balance.
+			// This implementation assumes `account.balance` is a snapshot and transactions modify it.
 			acc[account.id] = balance;
 			return acc;
 		}, {});
-		const totalBalance = Object.values(currentBalances).reduce(
-			(sum, b) => sum + b,
-			0,
-		);
-		return { accountBalances: currentBalances, totalBalance };
-	}, [accounts, transactions]);
 
-	const handleSaveTransaction = (newTx) => {
-		const index = transactions.findIndex((t) => t.id === newTx.id);
-		let updated;
-		if (index > -1) {
-			updated = [...transactions];
-			updated[index] = newTx;
+		const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+
+		return { accountBalances: currentBalances, totalBalance };
+	}, [accounts]);
+
+	const handleSaveTransaction = async (newTx) => {
+		const db = await initDB();
+		await db.put("transactions", newTx);
+		const allTxs = await db.getAll("transactions");
+		setTransactions(allTxs);
+		// Update account balance
+		const tx = db.transaction("accounts", "readwrite");
+		if (newTx.type === "transfer") {
+			const fromAccount = await tx.store.get(newTx.from);
+			const toAccount = await tx.store.get(newTx.to);
+			await tx.store.put({
+				...fromAccount,
+				balance: fromAccount.balance - newTx.amount - (newTx.fee || 0),
+			});
+			await tx.store.put({
+				...toAccount,
+				balance: toAccount.balance + newTx.amount,
+			});
 		} else {
-			updated = [...transactions, newTx];
+			const account = await tx.store.get(newTx.accountId);
+			const newBalance =
+				newTx.type === "income"
+					? account.balance + newTx.amount
+					: account.balance - newTx.amount;
+			await tx.store.put({ ...account, balance: newBalance });
 		}
-		updateStateAndDB("transactions", updated, setTransactions);
+		await tx.done;
+		const allAccounts = await db.getAll("accounts");
+		setAccounts(allAccounts);
 	};
-	const handleDeleteTransaction = (txId) => {
-		const updated = transactions.filter((t) => t.id !== txId);
-		updateStateAndDB("transactions", updated, setTransactions);
+
+	const handleDeleteTransaction = async (txId) => {
+		const db = await initDB();
+		const txToDelete = await db.get("transactions", txId);
+
+		if (!txToDelete) return;
+
+		// Revert balance changes
+		const accountTx = db.transaction("accounts", "readwrite");
+		if (txToDelete.type === "transfer") {
+			const fromAccount = await accountTx.store.get(txToDelete.from);
+			const toAccount = await accountTx.store.get(txToDelete.to);
+			if (fromAccount) {
+				await accountTx.store.put({
+					...fromAccount,
+					balance:
+						fromAccount.balance + txToDelete.amount + (txToDelete.fee || 0),
+				});
+			}
+			if (toAccount) {
+				await accountTx.store.put({
+					...toAccount,
+					balance: toAccount.balance - txToDelete.amount,
+				});
+			}
+		} else {
+			const account = await accountTx.store.get(txToDelete.accountId);
+			if (account) {
+				const revertedBalance =
+					txToDelete.type === "income"
+						? account.balance - txToDelete.amount
+						: account.balance + txToDelete.amount;
+				await accountTx.store.put({ ...account, balance: revertedBalance });
+			}
+		}
+
+		await accountTx.done;
+
+		// Delete the transaction
+		await db.delete("transactions", txId);
+
+		// Update state
+		const allTxs = await db.getAll("transactions");
+		const allAccounts = await db.getAll("accounts");
+		setTransactions(allTxs);
+		setAccounts(allAccounts);
 	};
+
 	const handleSaveBudget = (newBudget) => {
 		const index = budgets.findIndex((b) => b.id === newBudget.id);
 		let updated;
@@ -768,6 +762,19 @@ const useFinTrack = () => {
 	};
 	const handleDeleteBudget = (budgetId) => {
 		const updated = budgets.filter((b) => b.id !== budgetId);
+		updateStateAndDB("budgets", updated, setBudgets);
+	};
+	const handleDuplicateBudget = (budgetId) => {
+		const budgetToDuplicate = budgets.find((b) => b.id === budgetId);
+		if (!budgetToDuplicate) return;
+
+		const newBudget = {
+			...budgetToDuplicate,
+			id: `bud-${Date.now()}`,
+			name: `${budgetToDuplicate.name} (Copy)`,
+		};
+
+		const updated = [...budgets, newBudget];
 		updateStateAndDB("budgets", updated, setBudgets);
 	};
 	const handleSaveAccount = (newAccount) => {
@@ -824,6 +831,7 @@ const useFinTrack = () => {
 		categories,
 		setCategories: handleSetCategories,
 		recurringTransactions,
+		setRecurringTransactions,
 		handleSaveRecurringTransaction,
 		handleDeleteRecurringTransaction,
 		isDbLoading,
@@ -832,6 +840,7 @@ const useFinTrack = () => {
 		handleDeleteTransaction,
 		handleSaveBudget,
 		handleDeleteBudget,
+		handleDuplicateBudget,
 		handleSaveAccount,
 		handleDeleteAccount,
 	};
@@ -848,10 +857,8 @@ const Header = ({
 	const [panelOpen, setPanelOpen] = useState(false);
 	const unreadCount = notifications.filter((n) => !n.read).length;
 	return (
-		<header className="flex justify-between items-center px-4 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] bg-white dark:bg-gray-800 border-b dark:border-gray-700 sticky top-0 z-20">
-			{" "}
+		<header className="flex justify-between items-center px-4 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] bg-white dark:bg-gray-800 border-b dark:border-gray-700 sticky top-0 z-30">
 			<div className="flex items-center">
-				{" "}
 				{onBack && (
 					<button
 						onClick={onBack}
@@ -859,34 +866,29 @@ const Header = ({
 					>
 						<ChevronLeft className="h-6 w-6 text-gray-600 dark:text-gray-300" />
 					</button>
-				)}{" "}
+				)}
 				<h1 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white">
 					{pageTitle}
-				</h1>{" "}
-			</div>{" "}
+				</h1>
+			</div>
 			<div className="flex items-center space-x-2 md:space-x-4">
-				{" "}
 				<div className="relative">
-					{" "}
 					<button
 						type="button"
 						onClick={() => setPanelOpen(!panelOpen)}
 						className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 relative"
 					>
-						{" "}
-						<Bell className="h-6 w-6 text-gray-600 dark:text-gray-300" />{" "}
+						<Bell className="h-6 w-6 text-gray-600 dark:text-gray-300" />
 						{unreadCount > 0 && (
 							<span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-500"></span>
-						)}{" "}
-					</button>{" "}
+						)}
+					</button>
 					{panelOpen && (
-						<div className="absolute right-0 mt-2 w-72 md:w-80 bg-white dark:bg-gray-700 rounded-lg shadow-xl z-20">
-							{" "}
+						<div className="absolute right-0 mt-2 w-72 md:w-80 bg-white dark:bg-gray-700 rounded-lg shadow-xl z-30">
 							<div className="p-3 flex justify-between items-center border-b dark:border-gray-600">
-								{" "}
 								<h4 className="font-semibold text-gray-800 dark:text-white">
 									Notifications
-								</h4>{" "}
+								</h4>
 								{notifications.length > 0 && (
 									<button
 										type="button"
@@ -898,54 +900,59 @@ const Header = ({
 									>
 										Clear all
 									</button>
-								)}{" "}
-							</div>{" "}
+								)}
+							</div>
 							<div className="max-h-80 overflow-y-auto">
-								{" "}
 								{notifications.length > 0 ? (
 									notifications.map((n) => (
 										<div
 											key={n.id}
 											className="p-3 flex items-start space-x-3 border-b dark:border-gray-600 last:border-b-0"
 										>
-											{" "}
 											{n.type === "warning" ? (
 												<AlertTriangle className="h-5 w-5 text-yellow-500 mt-1 flex-shrink-0" />
 											) : (
 												<CheckCircle className="h-5 w-5 text-red-500 mt-1 flex-shrink-0" />
-											)}{" "}
+											)}
 											<div>
-												{" "}
 												<p className="text-sm text-gray-700 dark:text-gray-200">
 													{n.message}
-												</p>{" "}
+												</p>
 												<p className="text-xs text-gray-400 dark:text-gray-500">
 													{new Date(n.date).toLocaleString()}
-												</p>{" "}
-											</div>{" "}
+												</p>
+											</div>
 										</div>
 									))
 								) : (
 									<p className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">
 										No new notifications.
 									</p>
-								)}{" "}
-							</div>{" "}
+								)}
+							</div>
 						</div>
-					)}{" "}
-				</div>{" "}
+					)}
+				</div>
 				<button
 					type="button"
 					onClick={onSettingsClick}
 					className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
 				>
 					<Settings className="h-6 w-6 text-gray-600 dark:text-gray-300" />
-				</button>{" "}
-			</div>{" "}
+				</button>
+			</div>
 		</header>
 	);
 };
-const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message }) => {
+const ConfirmationModal = ({
+	isOpen,
+	onClose,
+	onConfirm,
+	title,
+	message,
+	confirmText = "Confirm",
+	children,
+}) => {
 	if (!isOpen) return null;
 	return (
 		<div
@@ -954,34 +961,33 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message }) => {
 				if (e.target === e.currentTarget) onClose();
 			}}
 		>
-			{" "}
 			<Card className="w-full max-w-sm">
-				{" "}
 				<h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
 					{title}
-				</h2>{" "}
-				<p className="text-gray-600 dark:text-gray-300 mb-4">{message}</p>{" "}
-				<div className="flex justify-end space-x-3">
-					{" "}
+				</h2>
+				<p className="text-gray-600 dark:text-gray-300 mb-4">{message}</p>
+				{children}
+				<div className="flex justify-end space-x-3 mt-4">
 					<button
 						type="button"
 						onClick={onClose}
 						className="px-4 py-2 rounded-md text-gray-700 dark:text-gray-200 bg-gray-200 dark:bg-gray-600"
 					>
 						Cancel
-					</button>{" "}
+					</button>
 					<button
 						type="button"
 						onClick={onConfirm}
 						className="px-4 py-2 rounded-md text-white bg-red-600 hover:bg-red-700"
 					>
-						Confirm
-					</button>{" "}
-				</div>{" "}
-			</Card>{" "}
+						{confirmText}
+					</button>
+				</div>
+			</Card>
 		</div>
 	);
 };
+
 const BottomNav = ({ activeView, onTabClick }) => {
 	const navItems = [
 		{ name: "Dashboard", icon: Home, view: "dashboard" },
@@ -991,7 +997,6 @@ const BottomNav = ({ activeView, onTabClick }) => {
 	];
 	return (
 		<div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t dark:border-gray-700 flex justify-around px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] z-20 md:hidden">
-			{" "}
 			{navItems.map((item) => (
 				<button
 					type="button"
@@ -999,11 +1004,10 @@ const BottomNav = ({ activeView, onTabClick }) => {
 					onClick={() => onTabClick(item.view)}
 					className={`flex flex-col items-center space-y-1 w-20 ${activeView === item.view ? "text-indigo-600 dark:text-indigo-400" : "text-gray-500 dark:text-gray-400"}`}
 				>
-					{" "}
-					<item.icon className="h-6 w-6" />{" "}
-					<span className="text-xs">{item.name}</span>{" "}
+					<item.icon className="h-6 w-6" />
+					<span className="text-xs">{item.name}</span>
 				</button>
-			))}{" "}
+			))}
 		</div>
 	);
 };
@@ -1017,12 +1021,10 @@ const Sidebar = ({ activeView, onTabClick }) => {
 	];
 	return (
 		<div className="hidden md:block fixed inset-y-0 left-0 z-10 w-64 bg-white dark:bg-gray-800 border-r dark:border-gray-700 p-4">
-			{" "}
 			<h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-8">
 				FinTrack
-			</h2>{" "}
+			</h2>
 			<nav className="flex flex-col space-y-2">
-				{" "}
 				{navItems.map((item) => (
 					<button
 						type="button"
@@ -1030,11 +1032,10 @@ const Sidebar = ({ activeView, onTabClick }) => {
 						onClick={() => onTabClick(item.view)}
 						className={`flex items-center space-x-3 p-3 rounded-lg ${activeView === item.view ? "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300" : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"}`}
 					>
-						{" "}
-						<item.icon className="h-6 w-6" /> <span>{item.name}</span>{" "}
+						<item.icon className="h-6 w-6" /> <span>{item.name}</span>
 					</button>
-				))}{" "}
-			</nav>{" "}
+				))}
+			</nav>
 		</div>
 	);
 };
@@ -1046,6 +1047,7 @@ const TransactionModal = ({
 	accounts,
 	categories,
 	onError,
+	isCorrectionMode,
 }) => {
 	const [type, setType] = useState("expense");
 	const [accountId, setAccountId] = useState(accounts[0]?.id || "");
@@ -1094,12 +1096,13 @@ const TransactionModal = ({
 	}, [isOpen, isEditMode, transactionToEdit, accounts, categories]);
 
 	useEffect(() => {
+		if (isCorrectionMode) return;
 		if (type === "income") {
 			setCategory(Object.keys(categories.income)[0] || "");
 		} else {
 			setCategory(Object.keys(categories.expense)[0] || "");
 		}
-	}, [type, categories]);
+	}, [type, categories, isCorrectionMode]);
 
 	const handleSubmit = (e) => {
 		e.preventDefault();
@@ -1107,25 +1110,36 @@ const TransactionModal = ({
 			onError("Please enter a valid amount.");
 			return;
 		}
-		const newTx = {
+
+		const baseTx = {
 			id: isEditMode ? transactionToEdit.id : `tx-${Date.now()}`,
 			amount: parseFloat(amount),
 			date,
 			description,
 			type,
 		};
+
+		let newTx;
+
 		if (type === "transfer") {
 			if (fromAccount === toAccount) {
 				onError("Cannot transfer to the same account.");
 				return;
 			}
-			newTx.from = fromAccount;
-			newTx.to = toAccount;
+			newTx = {
+				...baseTx,
+				from: fromAccount,
+				to: toAccount,
+			};
 			if (fee) newTx.fee = parseFloat(fee);
 		} else {
-			newTx.accountId = accountId;
-			newTx.category = category;
+			newTx = {
+				...baseTx,
+				accountId: accountId,
+				category: category,
+			};
 		}
+
 		onSave(newTx);
 		onClose();
 	};
@@ -1146,68 +1160,59 @@ const TransactionModal = ({
 				if (e.target === e.currentTarget) onClose();
 			}}
 		>
-			{" "}
 			<Card className="w-full max-w-md">
-				{" "}
 				<div className="flex justify-between items-center mb-4">
-					{" "}
 					<h2 className="text-lg font-semibold">
 						{isEditMode ? "Edit" : "Add"} Transaction
-					</h2>{" "}
+					</h2>
 					<button type="button" onClick={onClose}>
 						<X className="h-6 w-6" />
-					</button>{" "}
-				</div>{" "}
-				<div className="flex justify-center mb-4 border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
-					{" "}
-					{typeOptions.map((opt) => (
-						<button
-							key={opt.value}
-							onClick={() => setType(opt.value)}
-							className={`flex-1 py-2 text-sm font-semibold capitalize transition-colors ${type === opt.value ? "bg-indigo-600 text-white" : "bg-transparent text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"}`}
-						>
-							{" "}
-							{opt.label}{" "}
-						</button>
-					))}{" "}
-				</div>{" "}
+					</button>
+				</div>
+				{!isCorrectionMode && (
+					<div className="flex justify-center mb-4 border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
+						{typeOptions.map((opt) => (
+							<button
+								key={opt.value}
+								onClick={() => setType(opt.value)}
+								className={`flex-1 py-2 text-sm font-semibold capitalize transition-colors ${type === opt.value ? "bg-indigo-600 text-white" : "bg-transparent text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"}`}
+							>
+								{opt.label}
+							</button>
+						))}
+					</div>
+				)}
 				<form onSubmit={handleSubmit} className="space-y-4">
-					{" "}
 					<div className="grid grid-cols-1 gap-4">
-						{" "}
 						<div className="flex items-center gap-4">
-							{" "}
 							<label htmlFor="tx-date" className="w-24">
 								Date
-							</label>{" "}
+							</label>
 							<input
 								id="tx-date"
 								type="date"
 								value={date}
 								onChange={(e) => setDate(e.target.value)}
 								className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-							/>{" "}
-						</div>{" "}
+							/>
+						</div>
 						<div className="flex items-center gap-4">
-							{" "}
 							<label htmlFor="tx-amount" className="w-24">
 								Amount
-							</label>{" "}
+							</label>
 							<CalculatorInput
 								id="tx-amount"
 								value={amount}
 								onChange={(e) => setAmount(e.target.value)}
 								placeholder="0.00"
-							/>{" "}
-						</div>{" "}
-						{type === "transfer" ? (
+							/>
+						</div>
+						{type === "transfer" && !isCorrectionMode ? (
 							<>
-								{" "}
 								<div className="flex items-center gap-4">
-									{" "}
 									<label htmlFor="tx-from" className="w-24">
 										From
-									</label>{" "}
+									</label>
 									<select
 										id="tx-from"
 										value={fromAccount}
@@ -1219,13 +1224,12 @@ const TransactionModal = ({
 												{a.name}
 											</option>
 										))}
-									</select>{" "}
-								</div>{" "}
+									</select>
+								</div>
 								<div className="flex items-center gap-4">
-									{" "}
 									<label htmlFor="tx-to" className="w-24">
 										To
-									</label>{" "}
+									</label>
 									<select
 										id="tx-to"
 										value={toAccount}
@@ -1237,47 +1241,49 @@ const TransactionModal = ({
 												{a.name}
 											</option>
 										))}
-									</select>{" "}
-								</div>{" "}
+									</select>
+								</div>
 								<div className="flex items-center gap-4">
-									{" "}
 									<label htmlFor="tx-fee" className="w-24">
 										Fee
-									</label>{" "}
+									</label>
 									<CalculatorInput
 										id="tx-fee"
 										value={fee}
 										onChange={(e) => setFee(e.target.value)}
 										placeholder="0.00"
-									/>{" "}
-								</div>{" "}
+									/>
+								</div>
 							</>
 						) : (
 							<>
-								{" "}
 								<div className="flex items-center gap-4">
-									{" "}
 									<label htmlFor="tx-category" className="w-24">
 										Category
-									</label>{" "}
-									<select
-										id="tx-category"
-										value={category}
-										onChange={(e) => setCategory(e.target.value)}
-										className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-									>
-										{Object.keys(categoryOptions).map((c) => (
-											<option key={c} value={c}>
-												{c}
-											</option>
-										))}
-									</select>{" "}
-								</div>{" "}
+									</label>
+									{isCorrectionMode ? (
+										<div className="w-full p-2 border rounded-md bg-gray-100 dark:bg-gray-800 dark:border-gray-600">
+											{category}
+										</div>
+									) : (
+										<select
+											id="tx-category"
+											value={category}
+											onChange={(e) => setCategory(e.target.value)}
+											className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+										>
+											{Object.keys(categoryOptions).map((c) => (
+												<option key={c} value={c}>
+													{c}
+												</option>
+											))}
+										</select>
+									)}
+								</div>
 								<div className="flex items-center gap-4">
-									{" "}
 									<label htmlFor="tx-account" className="w-24">
 										Account
-									</label>{" "}
+									</label>
 									<select
 										id="tx-account"
 										value={accountId}
@@ -1289,32 +1295,31 @@ const TransactionModal = ({
 												{a.name}
 											</option>
 										))}
-									</select>{" "}
-								</div>{" "}
+									</select>
+								</div>
 							</>
-						)}{" "}
+						)}
 						<div className="flex items-center gap-4">
-							{" "}
 							<label htmlFor="tx-desc" className="w-24">
 								Note
-							</label>{" "}
+							</label>
 							<input
 								id="tx-desc"
 								type="text"
 								value={description}
 								onChange={(e) => setDescription(e.target.value)}
 								className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-							/>{" "}
-						</div>{" "}
-					</div>{" "}
+							/>
+						</div>
+					</div>
 					<button
 						type="submit"
 						className="w-full bg-indigo-600 text-white font-semibold p-3 rounded-lg hover:bg-indigo-700 mt-6"
 					>
 						{isEditMode ? "Save Changes" : "Add Transaction"}
-					</button>{" "}
-				</form>{" "}
-			</Card>{" "}
+					</button>
+				</form>
+			</Card>
 		</div>
 	);
 };
@@ -1404,9 +1409,7 @@ const BudgetModal = ({
 				if (e.target === e.currentTarget) onClose();
 			}}
 		>
-			{" "}
 			<Card className="w-full max-w-lg">
-				{" "}
 				<div className="flex justify-between items-center mb-4">
 					<h2 className="text-lg font-semibold">
 						{isEditMode ? "Edit" : "Create"} Budget
@@ -1414,9 +1417,8 @@ const BudgetModal = ({
 					<button type="button" onClick={onClose}>
 						<X className="h-6 w-6" />
 					</button>
-				</div>{" "}
+				</div>
 				<form onSubmit={handleSubmit} className="space-y-4">
-					{" "}
 					<div>
 						<label htmlFor="budget-name">Budget Name</label>
 						<input
@@ -1425,7 +1427,7 @@ const BudgetModal = ({
 							onChange={(e) => setName(e.target.value)}
 							className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
 						/>
-					</div>{" "}
+					</div>
 					<div>
 						<label htmlFor="budget-period">Period</label>
 						<select
@@ -1437,10 +1439,9 @@ const BudgetModal = ({
 							<option>Monthly</option>
 							<option>Custom</option>
 						</select>
-					</div>{" "}
+					</div>
 					{period === "Custom" && (
 						<div className="flex gap-2">
-							{" "}
 							<div>
 								<label htmlFor="budget-start">Start Date</label>
 								<input
@@ -1450,7 +1451,7 @@ const BudgetModal = ({
 									onChange={(e) => setStartDate(e.target.value)}
 									className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
 								/>
-							</div>{" "}
+							</div>
 							<div>
 								<label htmlFor="budget-end">End Date</label>
 								<input
@@ -1460,38 +1461,34 @@ const BudgetModal = ({
 									onChange={(e) => setEndDate(e.target.value)}
 									className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
 								/>
-							</div>{" "}
+							</div>
 						</div>
-					)}{" "}
+					)}
 					<div className="border-t pt-4 dark:border-gray-600">
-						<h4 className="font-semibold mb-2">Budget Categories</h4>{" "}
+						<h4 className="font-semibold mb-2">Budget Categories</h4>
 						<div className="space-y-2 mb-4 max-h-40 overflow-y-auto pr-2">
-							{" "}
 							{Object.entries(categories).map(([cat, lim]) => (
 								<div
 									key={cat}
 									className="flex justify-between items-center p-2 bg-gray-100 dark:bg-gray-700 rounded-md"
 								>
-									{" "}
-									<span className="flex-grow">{cat}</span>{" "}
+									<span className="flex-grow">{cat}</span>
 									<div className="flex items-center gap-2">
-										{" "}
 										<div className="bg-gray-200 dark:bg-gray-600 px-3 py-1 rounded-md text-sm font-mono">
 											${lim.toFixed(2)}
-										</div>{" "}
+										</div>
 										<button
 											type="button"
 											onClick={() => handleRemoveCategory(cat)}
 											className="p-1 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-full"
 										>
 											<Trash2 className="w-4 h-4 text-red-500" />
-										</button>{" "}
-									</div>{" "}
+										</button>
+									</div>
 								</div>
-							))}{" "}
-						</div>{" "}
+							))}
+						</div>
 						<div className="flex gap-2 items-end">
-							{" "}
 							<div className="flex-grow">
 								<label htmlFor="budget-cat-select" className="text-sm">
 									Category
@@ -1508,7 +1505,7 @@ const BudgetModal = ({
 										</option>
 									))}
 								</select>
-							</div>{" "}
+							</div>
 							<div className="w-32">
 								<label htmlFor="budget-cat-limit" className="text-sm">
 									Limit
@@ -1519,24 +1516,24 @@ const BudgetModal = ({
 									onChange={(e) => setLimit(e.target.value)}
 									placeholder="$0.00"
 								/>
-							</div>{" "}
+							</div>
 							<button
 								type="button"
 								onClick={handleAddCategory}
 								className="p-2 h-10 bg-gray-200 dark:bg-gray-600 rounded-md"
 							>
 								<Plus className="h-5 w-5" />
-							</button>{" "}
-						</div>{" "}
-					</div>{" "}
+							</button>
+						</div>
+					</div>
 					<button
 						type="submit"
 						className="w-full bg-indigo-600 text-white font-semibold p-3 rounded-lg hover:bg-indigo-700"
 					>
 						{isEditMode ? "Save Changes" : "Create Budget"}
-					</button>{" "}
-				</form>{" "}
-			</Card>{" "}
+					</button>
+				</form>
+			</Card>
 		</div>
 	);
 };
@@ -1546,7 +1543,6 @@ const AccountModal = ({
 	onSave,
 	onDelete,
 	accountToEdit,
-	calculatedBalance,
 	onSaveTransaction,
 	onError,
 }) => {
@@ -1554,22 +1550,48 @@ const AccountModal = ({
 	const [type, setType] = useState("Debit Card");
 	const [balance, setBalance] = useState("");
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-	const isEditMode = !!accountToEdit;
+	const [correctionData, setCorrectionData] = useState(null); // { difference: number }
 
 	useEffect(() => {
 		if (isOpen) {
-			if (isEditMode) {
+			if (accountToEdit) {
 				setName(accountToEdit.name);
 				setType(accountToEdit.type);
-				setBalance(calculatedBalance.toFixed(2));
+				setBalance(accountToEdit.balance.toFixed(2));
 			} else {
 				setName("");
 				setType("Debit Card");
 				setBalance("");
 			}
 			setShowDeleteConfirm(false);
+			setCorrectionData(null);
 		}
-	}, [isOpen, isEditMode, accountToEdit, calculatedBalance]);
+	}, [isOpen, accountToEdit]);
+
+	const handleConfirmCorrection = () => {
+		if (!correctionData) return;
+		const { difference } = correctionData;
+		const isPositive = difference > 0;
+
+		const correctionTx = {
+			id: `tx-${Date.now()}`,
+			accountId: accountToEdit.id,
+			amount: Math.abs(difference),
+			date: formatDateForInput(new Date()),
+			description: "Manual balance correction",
+			type: isPositive ? "income" : "expense",
+			category: isPositive ? "Balance Adjustment" : "Balance Correction",
+		};
+
+		// By only calling onSaveTransaction, we let the transaction logic handle the balance update.
+		// This prevents the race condition where the account balance was updated directly,
+		// causing the transaction to apply its change to the already-updated balance.
+		// Note: Changes to the account name/type will be discarded if the balance is also changed.
+		// This is a trade-off to fix the critical bug.
+		onSaveTransaction(correctionTx);
+		onClose();
+	};
+
 	const handleSubmit = (e) => {
 		e.preventDefault();
 		if (!name) {
@@ -1580,32 +1602,32 @@ const AccountModal = ({
 			onError("Balance is required.");
 			return;
 		}
+
 		const newBalance = parseFloat(balance);
+		const isEditMode = !!accountToEdit;
+
 		if (isEditMode) {
-			const balanceDifference = newBalance - calculatedBalance;
+			const balanceDifference = newBalance - accountToEdit.balance;
 			if (Math.abs(balanceDifference) > 0.001) {
-				const correctionTx = {
-					id: `tx-${Date.now()}`,
-					accountId: accountToEdit.id,
-					type: balanceDifference > 0 ? "income" : "expense",
-					amount: Math.abs(balanceDifference),
-					category: "Balance Correction",
-					date: formatDateForInput(new Date()),
-					description: "Manual balance correction",
-				};
-				onSaveTransaction(correctionTx);
+				setCorrectionData({ difference: balanceDifference });
+				return; // Show confirmation view
 			}
-			onSave({ ...accountToEdit, name, type });
+			// No balance change, just save other details
+			onSave({ ...accountToEdit, name, type, balance: accountToEdit.balance });
+			onClose();
 		} else {
+			// Creating a new account
 			onSave({ id: `acc-${Date.now()}`, name, type, balance: newBalance });
+			onClose();
 		}
-		onClose();
 	};
+
 	const handleDelete = () => {
 		onDelete(accountToEdit.id);
 		setShowDeleteConfirm(false);
 		onClose();
 	};
+
 	if (!isOpen) return null;
 
 	return (
@@ -1615,82 +1637,112 @@ const AccountModal = ({
 				if (e.target === e.currentTarget) onClose();
 			}}
 		>
-			{" "}
 			<Card className="w-full max-w-md">
-				{" "}
 				<div className="flex justify-between items-center mb-6">
-					{" "}
 					<h2 className="text-lg font-semibold">
-						{isEditMode ? "Edit Account" : "Add Account"}
-					</h2>{" "}
+						{accountToEdit ? "Edit Account" : "Add Account"}
+					</h2>
 					<button type="button" onClick={onClose}>
 						<X className="h-6 w-6" />
-					</button>{" "}
-				</div>{" "}
-				<form onSubmit={handleSubmit} className="space-y-4">
-					{" "}
-					<div>
-						<label htmlFor="acc-name">Account Name</label>
-						<input
-							id="acc-name"
-							value={name}
-							onChange={(e) => setName(e.target.value)}
-							className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-						/>
-					</div>{" "}
-					<div>
-						<label htmlFor="acc-type">Account Type</label>
-						<select
-							id="acc-type"
-							value={type}
-							onChange={(e) => setType(e.target.value)}
-							className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-						>
-							<option>Debit Card</option>
-							<option>Credit Card</option>
-							<option>Savings</option>
-							<option>Cash</option>
-							<option>Friends</option>
-						</select>
-					</div>{" "}
-					<div>
-						<label htmlFor="acc-balance">
-							{isEditMode ? "Corrected Balance" : "Initial Balance"}
-						</label>
-						<CalculatorInput
-							value={balance}
-							onChange={(e) => setBalance(e.target.value)}
-							step="0.01"
-						/>
-					</div>{" "}
-					<div className="flex justify-between items-center pt-4">
-						{" "}
-						{isEditMode && (
-							<button
-								type="button"
-								onClick={() => setShowDeleteConfirm(true)}
-								className="px-4 py-2 rounded-md text-white bg-red-600 hover:bg-red-700"
+					</button>
+				</div>
+
+				{!correctionData ? (
+					<form onSubmit={handleSubmit} className="space-y-4">
+						<div>
+							<label htmlFor="acc-name">Account Name</label>
+							<input
+								id="acc-name"
+								value={name}
+								onChange={(e) => setName(e.target.value)}
+								className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+							/>
+						</div>
+						<div>
+							<label htmlFor="acc-type">Account Type</label>
+							<select
+								id="acc-type"
+								value={type}
+								onChange={(e) => setType(e.target.value)}
+								className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
 							>
-								Delete
+								<option>Debit Card</option>
+								<option>Credit Card</option>
+								<option>Savings</option>
+								<option>Cash</option>
+								<option>Friends</option>
+							</select>
+						</div>
+						<div>
+							<label htmlFor="acc-balance">
+								{accountToEdit ? "Corrected Balance" : "Initial Balance"}
+							</label>
+							<CalculatorInput
+								value={balance}
+								onChange={(e) => setBalance(e.target.value)}
+								step="0.01"
+							/>
+						</div>
+						<div className="flex justify-between items-center pt-4">
+							{accountToEdit && (
+								<button
+									type="button"
+									onClick={() => setShowDeleteConfirm(true)}
+									className="px-4 py-2 rounded-md text-white bg-red-600 hover:bg-red-700"
+								>
+									Delete
+								</button>
+							)}
+							<div className="flex-grow" />
+							<button
+								type="submit"
+								className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700"
+							>
+								{accountToEdit ? "Save Changes" : "Add Account"}
 							</button>
-						)}{" "}
-						<div className="flex-grow" />{" "}
-						<button
-							type="submit"
-							className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700"
-						>
-							{isEditMode ? "Save Changes" : "Add Account"}
-						</button>{" "}
-					</div>{" "}
-				</form>{" "}
-			</Card>{" "}
+						</div>
+					</form>
+				) : (
+					<div>
+						<h3 className="text-lg font-semibold">Confirm Balance Change</h3>
+						<p className="my-4">
+							A difference of{" "}
+							<span
+								className={
+									correctionData.difference > 0
+										? "text-green-500"
+										: "text-red-500"
+								}
+							>
+								{formatCurrency(correctionData.difference)}
+							</span>{" "}
+							was detected. A correction transaction will be created to align
+							the balance.
+						</p>
+						<div className="flex justify-end space-x-3">
+							<button
+								onClick={onClose}
+								className="px-4 py-2 rounded-md bg-gray-200 dark:bg-gray-600"
+							>
+								Cancel
+							</button>
+							<button
+								onClick={handleConfirmCorrection}
+								className="px-4 py-2 rounded-md bg-indigo-600 text-white"
+							>
+								Confirm Correction
+							</button>
+						</div>
+					</div>
+				)}
+			</Card>
 			<ConfirmationModal
 				isOpen={showDeleteConfirm}
 				onClose={() => setShowDeleteConfirm(false)}
 				onConfirm={handleDelete}
 				title="Delete Account"
 				message={`Are you sure you want to delete the "${accountToEdit?.name}" account? This action cannot be undone.`}
-			/>{" "}
+			/>
 		</div>
 	);
 };
@@ -1781,20 +1833,16 @@ const CategoryModal = ({
 				if (e.target === e.currentTarget) onClose();
 			}}
 		>
-			{" "}
 			<Card className="w-full max-w-md">
-				{" "}
 				<div className="flex justify-between items-center mb-6">
-					{" "}
 					<h2 className="text-lg font-semibold">
 						{isEditMode ? "Edit" : "Add"} Category
-					</h2>{" "}
+					</h2>
 					<button type="button" onClick={onClose}>
 						<X className="h-6 w-6" />
-					</button>{" "}
-				</div>{" "}
+					</button>
+				</div>
 				<form onSubmit={handleSubmit} className="space-y-4">
-					{" "}
 					<div>
 						<label htmlFor="cat-name">Category Name</label>
 						<input
@@ -1803,48 +1851,42 @@ const CategoryModal = ({
 							onChange={(e) => setName(e.target.value)}
 							className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
 						/>
-					</div>{" "}
+					</div>
 					<div>
-						{" "}
-						<label>Icon</label>{" "}
+						<label>Icon</label>
 						<div className="flex items-center gap-4 p-3 bg-gray-100 dark:bg-gray-700 rounded-md">
-							{" "}
 							<div
 								className="w-12 h-12 flex items-center justify-center rounded-full flex-shrink-0"
 								style={{ backgroundColor: color }}
 							>
-								{" "}
 								<CategoryIcon
 									name={icon}
 									type={iconType}
 									className="w-7 h-7 text-white"
-								/>{" "}
-							</div>{" "}
+								/>
+							</div>
 							<div className="flex-grow">
-								{" "}
 								<div className="flex border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden">
-									{" "}
 									<button
 										type="button"
 										onClick={() => setPickerTab("icons")}
 										className={`px-4 py-1 text-sm flex-1 ${pickerTab === "icons" ? "bg-indigo-500 text-white" : "bg-transparent"}`}
 									>
 										Icons
-									</button>{" "}
+									</button>
 									<button
 										type="button"
 										onClick={() => setPickerTab("emojis")}
 										className={`px-4 py-1 text-sm flex-1 ${pickerTab === "emojis" ? "bg-indigo-500 text-white" : "bg-transparent"}`}
 									>
 										Emojis
-									</button>{" "}
-								</div>{" "}
-							</div>{" "}
-						</div>{" "}
-					</div>{" "}
+									</button>
+								</div>
+							</div>
+						</div>
+					</div>
 					{pickerTab === "icons" && (
 						<div className="grid grid-cols-6 sm:grid-cols-8 gap-2 max-h-32 overflow-y-auto p-2 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
-							{" "}
 							{Object.keys(iconMap).map((i) => (
 								<button
 									type="button"
@@ -1855,16 +1897,14 @@ const CategoryModal = ({
 									}}
 									className={`p-2 rounded-lg flex items-center justify-center ${icon === i && iconType === "icon" ? "bg-indigo-200 dark:bg-indigo-800" : "hover:bg-gray-200 dark:hover:bg-gray-700"}`}
 								>
-									{" "}
-									<CategoryIcon name={i} className="w-6 h-6" />{" "}
+									<CategoryIcon name={i} className="w-6 h-6" />
 								</button>
-							))}{" "}
+							))}
 						</div>
-					)}{" "}
+					)}
 					{pickerTab === "emojis" && (
 						<div>
-							{" "}
-							<label htmlFor="emoji-input">Enter Emoji</label>{" "}
+							<label htmlFor="emoji-input">Enter Emoji</label>
 							<input
 								id="emoji-input"
 								type="text"
@@ -1875,14 +1915,12 @@ const CategoryModal = ({
 								}}
 								className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 text-2xl text-center"
 								placeholder="😀"
-							/>{" "}
+							/>
 						</div>
-					)}{" "}
+					)}
 					<div>
-						{" "}
-						<label>Color</label>{" "}
+						<label>Color</label>
 						<div className="flex flex-wrap items-center gap-3 mt-2">
-							{" "}
 							{colorPalette.map((c) => (
 								<button
 									type="button"
@@ -1891,37 +1929,34 @@ const CategoryModal = ({
 									className={`w-8 h-8 rounded-full border-2 ${color === c ? "border-indigo-500 ring-2 ring-indigo-500" : "border-transparent"}`}
 									style={{ backgroundColor: c }}
 								></button>
-							))}{" "}
+							))}
 							<div className="relative">
-								{" "}
 								<input
 									type="color"
 									value={color}
 									onChange={(e) => setColor(e.target.value)}
 									className="w-8 h-8 rounded-full opacity-0 absolute cursor-pointer"
-								/>{" "}
+								/>
 								<div
 									className="w-8 h-8 rounded-full border-2 border-gray-300 dark:border-gray-500 flex items-center justify-center"
 									style={{ backgroundColor: color }}
 								>
-									{" "}
 									<Palette
 										size={16}
 										className="text-white mix-blend-difference"
-									/>{" "}
-								</div>{" "}
-							</div>{" "}
+									/>
+								</div>
+							</div>
 							<input
 								type="text"
 								value={color}
 								onChange={(e) => setColor(e.target.value)}
 								className="p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 w-24 font-mono"
 								placeholder="#8B5CF6"
-							/>{" "}
-						</div>{" "}
-					</div>{" "}
+							/>
+						</div>
+					</div>
 					<div className="flex justify-between items-center pt-4">
-						{" "}
 						{isEditMode && !categories.special[name] && (
 							<button
 								type="button"
@@ -1930,24 +1965,24 @@ const CategoryModal = ({
 							>
 								Delete
 							</button>
-						)}{" "}
-						<div className="flex-grow" />{" "}
+						)}
+						<div className="flex-grow" />
 						<button
 							type="submit"
 							className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700"
 						>
 							{isEditMode ? "Save Changes" : "Add Category"}
-						</button>{" "}
-					</div>{" "}
-				</form>{" "}
-			</Card>{" "}
+						</button>
+					</div>
+				</form>
+			</Card>
 			<ConfirmationModal
 				isOpen={showDeleteConfirm}
 				onClose={() => setShowDeleteConfirm(false)}
 				onConfirm={handleDelete}
 				title="Delete Category"
 				message={`Are you sure you want to delete the "${categoryToEdit?.id}" category? This cannot be undone.`}
-			/>{" "}
+			/>
 		</div>
 	);
 };
@@ -1966,6 +2001,7 @@ const DashboardPage = ({ finTrackData, txModalControls }) => {
 	const [referenceDate, setReferenceDate] = useState(new Date());
 
 	const { income, expenses, net } = useMemo(() => {
+		const specialCategories = Object.keys(categories.special || {});
 		let start, end;
 		const ref = new Date(referenceDate);
 		if (filterPeriod === "monthly") {
@@ -1983,11 +2019,28 @@ const DashboardPage = ({ finTrackData, txModalControls }) => {
 				return txDate >= start && txDate <= end;
 			})
 			.forEach((tx) => {
-				if (tx.type === "income") income += tx.amount;
-				else if (tx.type === "expense") expenses += tx.amount;
+				const fromAccount = accounts.find((a) => a.id === tx.from);
+				const toAccount = accounts.find((a) => a.id === tx.to);
+
+				if (tx.type === "income" && !specialCategories.includes(tx.category)) {
+					income += tx.amount;
+				} else if (
+					tx.type === "expense" &&
+					!specialCategories.includes(tx.category)
+				) {
+					expenses += tx.amount;
+				} else if (tx.type === "transfer") {
+					if (fromAccount?.type === "Savings") {
+						income += tx.amount; // Transfer from savings is income
+					}
+					if (toAccount?.type === "Savings") {
+						expenses += tx.amount; // Transfer to savings is an expense
+					}
+				}
 			});
 		return { income, expenses, net: income - expenses };
-	}, [transactions, filterPeriod, referenceDate]);
+	}, [transactions, filterPeriod, referenceDate, accounts, categories]);
+
 	const handlePrev = () => {
 		const newDate = new Date(referenceDate);
 		if (filterPeriod === "monthly") {
@@ -2002,36 +2055,32 @@ const DashboardPage = ({ finTrackData, txModalControls }) => {
 		if (filterPeriod === "monthly") {
 			newDate.setMonth(newDate.getMonth() + 1);
 		} else {
-			newDate.setFullYear(newDate.getFullYear() - 1);
+			newDate.setFullYear(newDate.getFullYear() + 1);
 		}
 		setReferenceDate(newDate);
 	};
 
 	return (
 		<div className="p-4 md:p-6 space-y-6">
-			{" "}
 			<Card>
-				{" "}
 				<div className="flex justify-center items-center gap-2 mb-4">
-					{" "}
 					<button
 						onClick={handlePrev}
 						className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"
 					>
 						<ChevronLeft className="h-5 w-5" />
-					</button>{" "}
+					</button>
 					<span className="font-semibold text-center w-32">
 						{formatRangeLabel(filterPeriod, referenceDate)}
-					</span>{" "}
+					</span>
 					<button
 						onClick={handleNext}
 						className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"
 					>
 						<ChevronRight className="h-5 w-5" />
-					</button>{" "}
-				</div>{" "}
+					</button>
+				</div>
 				<div className="flex justify-center flex-wrap gap-2 mb-4">
-					{" "}
 					{["monthly", "annually"].map((p) => (
 						<button
 							key={p}
@@ -2040,22 +2089,21 @@ const DashboardPage = ({ finTrackData, txModalControls }) => {
 						>
 							{p}
 						</button>
-					))}{" "}
-				</div>{" "}
+					))}
+				</div>
 				<div className="flex flex-row justify-around gap-4 text-center">
-					{" "}
 					<div>
 						<h2 className="text-sm font-medium text-gray-500">Income</h2>
 						<p className="text-xl font-semibold text-green-500">
 							{formatCurrency(income, currency)}
 						</p>
-					</div>{" "}
+					</div>
 					<div>
 						<h2 className="text-sm font-medium text-gray-500">Expenses</h2>
 						<p className="text-xl font-semibold text-red-500">
 							{formatCurrency(expenses, currency)}
 						</p>
-					</div>{" "}
+					</div>
 					<div>
 						<h2 className="text-sm font-medium text-gray-500">Net</h2>
 						<p
@@ -2063,11 +2111,10 @@ const DashboardPage = ({ finTrackData, txModalControls }) => {
 						>
 							{formatCurrency(net, currency)}
 						</p>
-					</div>{" "}
-				</div>{" "}
-			</Card>{" "}
+					</div>
+				</div>
+			</Card>
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-				{" "}
 				<SpendingAnalysis
 					transactions={transactions}
 					budget={budgets.find(
@@ -2077,13 +2124,13 @@ const DashboardPage = ({ finTrackData, txModalControls }) => {
 					)}
 					categories={categories}
 					currency={currency}
-				/>{" "}
+				/>
 				<FutureProjection
 					transactions={transactions}
 					currentBalance={calculatedData.totalBalance}
 					currency={currency}
-				/>{" "}
-			</div>{" "}
+				/>
+			</div>
 			<TransactionList
 				title="Recent Transactions"
 				transactions={[...transactions]
@@ -2093,7 +2140,7 @@ const DashboardPage = ({ finTrackData, txModalControls }) => {
 				accounts={accounts}
 				categories={categories}
 				currency={currency}
-			/>{" "}
+			/>
 		</div>
 	);
 };
@@ -2134,7 +2181,6 @@ const SpendingAnalysis = ({ transactions, budget, categories, currency }) => {
 
 	return (
 		<Card>
-			{" "}
 			<h2 className="text-lg font-semibold mb-4">
 				Spending Analysis: {budget.name}
 			</h2>
@@ -2195,12 +2241,10 @@ const FutureProjection = ({ transactions, currentBalance, currency }) => {
 	}, [transactions, currentBalance]);
 	return (
 		<Card>
-			{" "}
 			<h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
 				Future Projection
-			</h2>{" "}
+			</h2>
 			<div className="space-y-4">
-				{" "}
 				<div className="flex justify-between items-center">
 					<span className="text-sm text-gray-500">
 						Est. spending next 7 days:
@@ -2208,7 +2252,7 @@ const FutureProjection = ({ transactions, currentBalance, currency }) => {
 					<span className="font-semibold">
 						~{formatCurrency(projection.weekly, currency)}
 					</span>
-				</div>{" "}
+				</div>
 				<div className="flex justify-between items-center">
 					<span className="text-sm text-gray-500">
 						Est. spending rest of month:
@@ -2216,8 +2260,8 @@ const FutureProjection = ({ transactions, currentBalance, currency }) => {
 					<span className="font-semibold">
 						~{formatCurrency(projection.monthly, currency)}
 					</span>
-				</div>{" "}
-				<div className="border-t dark:border-gray-700 my-2"></div>{" "}
+				</div>
+				<div className="border-t dark:border-gray-700 my-2"></div>
 				<div className="flex justify-between items-center">
 					<span className="font-semibold">Projected End-of-Month Balance:</span>
 					<span
@@ -2225,11 +2269,11 @@ const FutureProjection = ({ transactions, currentBalance, currency }) => {
 					>
 						{formatCurrency(projection.endOfMonthBalance, currency)}
 					</span>
-				</div>{" "}
-			</div>{" "}
+				</div>
+			</div>
 			<p className="text-xs text-gray-400 dark:text-gray-500 mt-4 text-center">
 				Based on spending over the last 30 days.
-			</p>{" "}
+			</p>
 		</Card>
 	);
 };
@@ -2273,6 +2317,7 @@ const TransactionsPage = ({ finTrackData, txModalControls }) => {
 			endDate: formatDateForInput(end),
 		}));
 	}, [filterPeriod, referenceDate]);
+
 	const handleFilterChange = (e) => {
 		const { name, value } = e.target;
 		setFilter((prev) => ({ ...prev, [name]: value }));
@@ -2323,53 +2368,101 @@ const TransactionsPage = ({ finTrackData, txModalControls }) => {
 		}
 		setReferenceDate(newDate);
 	};
-	const filteredTransactions = useMemo(() => {
-		return transactions
-			.filter((tx) => tx.date >= filter.startDate && tx.date <= filter.endDate)
-			.filter((tx) => filter.type === "all" || tx.type === filter.type)
-			.filter((tx) => {
-				if (filter.accountId === "all") return true;
-				if (tx.type === "transfer") {
-					return tx.from === filter.accountId || tx.to === filter.accountId;
+
+	const { filteredTransactions, totalIncome, totalExpenses } = useMemo(() => {
+		const specialCategories = Object.keys(categories.special || {});
+		let totalIncome = 0;
+		let totalExpenses = 0;
+
+		const transactionsInPeriod = transactions.filter(
+			(tx) => tx.date >= filter.startDate && tx.date <= filter.endDate,
+		);
+
+		transactionsInPeriod.forEach((tx) => {
+			const fromAccount = accounts.find((a) => a.id === tx.from);
+			const toAccount = accounts.find((a) => a.id === tx.to);
+
+			if (tx.type === "income" && !specialCategories.includes(tx.category)) {
+				totalIncome += tx.amount;
+			} else if (
+				tx.type === "expense" &&
+				!specialCategories.includes(tx.category)
+			) {
+				totalExpenses += tx.amount;
+			} else if (tx.type === "transfer") {
+				if (fromAccount?.type === "Savings") {
+					totalIncome += tx.amount;
 				}
-				return tx.accountId === filter.accountId;
+				if (toAccount?.type === "Savings") {
+					totalExpenses += tx.amount;
+				}
+			}
+		});
+
+		const filteredTransactions = transactionsInPeriod
+			.filter((tx) => {
+				if (filter.accountId !== "all") {
+					if (tx.type === "transfer") {
+						if (tx.from !== filter.accountId && tx.to !== filter.accountId)
+							return false;
+					} else if (tx.accountId !== filter.accountId) {
+						return false;
+					}
+				}
+
+				if (filter.type === "all") return true;
+				if (specialCategories.includes(tx.category)) return false;
+
+				if (filter.type === "income") {
+					if (tx.type === "income") return true;
+					if (tx.type === "transfer") {
+						const fromAccount = accounts.find((a) => a.id === tx.from);
+						return fromAccount?.type === "Savings";
+					}
+				}
+				if (filter.type === "expense") {
+					if (tx.type === "expense") return true;
+					if (tx.type === "transfer") {
+						const toAccount = accounts.find((a) => a.id === tx.to);
+						return toAccount?.type === "Savings";
+					}
+				}
+				return tx.type === filter.type;
 			})
 			.sort((a, b) => b.date.localeCompare(a.date));
-	}, [transactions, filter]);
+
+		return { filteredTransactions, totalIncome, totalExpenses };
+	}, [transactions, filter, categories, accounts]);
 
 	return (
 		<div className="space-y-6">
-			{" "}
 			<div className="bg-white dark:bg-gray-800 p-4 md:px-6 shadow-sm">
-				{" "}
 				<div className="relative flex justify-center items-center gap-2 mb-4">
-					{" "}
 					<button
 						onClick={handlePrev}
 						disabled={filterPeriod === "custom"}
 						className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
 					>
 						<ChevronLeft className="h-5 w-5" />
-					</button>{" "}
+					</button>
 					<span className="font-semibold text-center w-auto sm:w-48 flex-shrink-0">
 						{formatRangeLabel(filterPeriod, referenceDate)}
-					</span>{" "}
+					</span>
 					<button
 						onClick={handleNext}
 						disabled={filterPeriod === "custom"}
 						className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
 					>
 						<ChevronRight className="h-5 w-5" />
-					</button>{" "}
+					</button>
 					<button
 						onClick={() => handlePeriodChange("custom")}
 						className={`absolute top-0 right-0 p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 ${filterPeriod === "custom" ? "text-indigo-600" : ""}`}
 					>
 						<Filter size={20} />
-					</button>{" "}
-				</div>{" "}
+					</button>
+				</div>
 				<div className="flex justify-center flex-wrap gap-2 mb-4 border-b dark:border-gray-700 pb-4">
-					{" "}
 					{["daily", "weekly", "monthly", "annually"].map((p) => (
 						<button
 							key={p}
@@ -2378,19 +2471,17 @@ const TransactionsPage = ({ finTrackData, txModalControls }) => {
 						>
 							{p}
 						</button>
-					))}{" "}
-				</div>{" "}
+					))}
+				</div>
 				{filterPeriod === "custom" && (
 					<div className="grid grid-cols-2 gap-4 items-end mb-4">
-						{" "}
 						<div>
-							{" "}
 							<label
 								htmlFor="startDate"
 								className="text-sm font-medium text-gray-600 dark:text-gray-300"
 							>
 								Start Date
-							</label>{" "}
+							</label>
 							<input
 								type="date"
 								name="startDate"
@@ -2398,16 +2489,15 @@ const TransactionsPage = ({ finTrackData, txModalControls }) => {
 								value={filter.startDate}
 								onChange={handleFilterChange}
 								className="mt-1 w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-							/>{" "}
-						</div>{" "}
+							/>
+						</div>
 						<div>
-							{" "}
 							<label
 								htmlFor="endDate"
 								className="text-sm font-medium text-gray-600 dark:text-gray-300"
 							>
 								End Date
-							</label>{" "}
+							</label>
 							<input
 								type="date"
 								name="endDate"
@@ -2415,20 +2505,18 @@ const TransactionsPage = ({ finTrackData, txModalControls }) => {
 								value={filter.endDate}
 								onChange={handleFilterChange}
 								className="mt-1 w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-							/>{" "}
-						</div>{" "}
+							/>
+						</div>
 					</div>
-				)}{" "}
+				)}
 				<div className="grid grid-cols-2 gap-4 items-end">
-					{" "}
 					<div>
-						{" "}
 						<label
 							htmlFor="type"
 							className="text-sm font-medium text-gray-600 dark:text-gray-300"
 						>
 							Type
-						</label>{" "}
+						</label>
 						<select
 							name="type"
 							id="type"
@@ -2440,16 +2528,15 @@ const TransactionsPage = ({ finTrackData, txModalControls }) => {
 							<option value="income">Income</option>
 							<option value="expense">Expense</option>
 							<option value="transfer">Transfer</option>
-						</select>{" "}
-					</div>{" "}
+						</select>
+					</div>
 					<div>
-						{" "}
 						<label
 							htmlFor="accountId"
 							className="text-sm font-medium text-gray-600 dark:text-gray-300"
 						>
 							Account
-						</label>{" "}
+						</label>
 						<select
 							name="accountId"
 							id="accountId"
@@ -2463,12 +2550,31 @@ const TransactionsPage = ({ finTrackData, txModalControls }) => {
 									{acc.name}
 								</option>
 							))}
-						</select>{" "}
-					</div>{" "}
-				</div>{" "}
-			</div>{" "}
+						</select>
+					</div>
+				</div>
+				<div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+					<div className="flex justify-around text-center">
+						<div>
+							<h3 className="text-sm text-gray-500 dark:text-gray-400">
+								Total Income
+							</h3>
+							<p className="text-lg font-semibold text-green-500">
+								{formatCurrency(totalIncome, currency)}
+							</p>
+						</div>
+						<div>
+							<h3 className="text-sm text-gray-500 dark:text-gray-400">
+								Total Expenses
+							</h3>
+							<p className="text-lg font-semibold text-red-500">
+								{formatCurrency(totalExpenses, currency)}
+							</p>
+						</div>
+					</div>
+				</div>
+			</div>
 			<div className="p-4 md:p-6 md:pt-0">
-				{" "}
 				<TransactionList
 					title="Transactions"
 					transactions={filteredTransactions}
@@ -2476,8 +2582,9 @@ const TransactionsPage = ({ finTrackData, txModalControls }) => {
 					accounts={accounts}
 					categories={categories}
 					currency={currency}
-				/>{" "}
-			</div>{" "}
+					contextAccountId={filter.accountId}
+				/>
+			</div>
 		</div>
 	);
 };
@@ -2488,12 +2595,11 @@ const TransactionList = ({
 	accounts,
 	categories,
 	currency,
+	contextAccountId,
 }) => (
 	<Card>
-		{" "}
-		<h2 className="text-lg font-semibold mb-4">{title}</h2>{" "}
+		<h2 className="text-lg font-semibold mb-4">{title}</h2>
 		<div className="space-y-4">
-			{" "}
 			{transactions.length > 0 ? (
 				transactions.map((tx) => (
 					<TransactionItem
@@ -2503,12 +2609,13 @@ const TransactionList = ({
 						accounts={accounts}
 						categories={categories}
 						currency={currency}
+						contextAccountId={contextAccountId}
 					/>
 				))
 			) : (
 				<p className="text-center text-gray-500">No transactions to show.</p>
-			)}{" "}
-		</div>{" "}
+			)}
+		</div>
 	</Card>
 );
 const TransactionItem = ({
@@ -2517,19 +2624,63 @@ const TransactionItem = ({
 	accounts,
 	categories,
 	currency,
+	contextAccountId,
 }) => {
 	const [menuOpen, setMenuOpen] = useState(false);
+	const menuRef = useRef(null);
+
+	useEffect(() => {
+		const handleClickOutside = (event) => {
+			if (menuRef.current && !menuRef.current.contains(event.target)) {
+				setMenuOpen(false);
+			}
+		};
+		document.addEventListener("mousedown", handleClickOutside);
+		return () => {
+			document.removeEventListener("mousedown", handleClickOutside);
+		};
+	}, [menuRef]);
+
 	const info = useMemo(() => {
-		if (tx.type === "transfer") {
-			const from = accounts.find((a) => a.id === tx.from)?.name;
-			const to = accounts.find((a) => a.id === tx.to)?.name;
+		if (
+			tx.category === "Balance Correction" ||
+			tx.category === "Balance Adjustment"
+		) {
+			const account = accounts.find((a) => a.id === tx.accountId);
 			return {
-				icon: ArrowRightLeft,
-				color: "text-blue-500",
-				title: tx.description || `Transfer`,
-				subtitle: `From ${from} to ${to}`,
+				icon: "PiggyBank",
+				color: tx.type === "income" ? "text-green-500" : "text-red-500",
+				title: tx.description || "Balance Adjustment",
+				subtitle: account ? account.name : "Modified Bal.",
+				iconType: "icon",
+				amountPrefix: tx.type === "income" ? "+" : "-",
 			};
 		}
+
+		if (tx.type === "transfer") {
+			const fromAccountName =
+				accounts.find((a) => a.id === tx.from)?.name || "Unknown";
+			const toAccountName =
+				accounts.find((a) => a.id === tx.to)?.name || "Unknown";
+			const subtitle = `From ${fromAccountName} to ${toAccountName}`;
+			const title = tx.description || "Transfer";
+
+			let color = "text-blue-500";
+			let amountPrefix = ""; // No prefix for general transfer view
+
+			if (contextAccountId && contextAccountId !== "all") {
+				if (tx.to === contextAccountId) {
+					color = "text-green-500";
+					amountPrefix = "+";
+				} else if (tx.from === contextAccountId) {
+					color = "text-red-500";
+					amountPrefix = "-";
+				}
+			}
+
+			return { icon: ArrowRightLeft, color, title, subtitle, amountPrefix };
+		}
+
 		const categoryInfo =
 			(categories[tx.type] && categories[tx.type][tx.category]) ||
 			(categories.special && categories.special[tx.category]);
@@ -2539,48 +2690,45 @@ const TransactionItem = ({
 			title: tx.description || tx.category,
 			subtitle: tx.category,
 			iconType: categoryInfo?.type,
+			amountPrefix: tx.type === "income" ? "+" : "-",
 		};
-	}, [tx, accounts, categories]);
+	}, [tx, accounts, categories, contextAccountId]);
+
 	return (
 		<div className="flex items-center justify-between">
-			{" "}
 			<div className="flex items-center space-x-4 flex-1">
-				{" "}
 				<div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-full">
 					<CategoryIcon
 						name={info.icon}
 						type={info.iconType}
 						className={`h-6 w-6 ${info.color}`}
 					/>
-				</div>{" "}
+				</div>
 				<div>
 					<p className="font-semibold">{info.title}</p>
 					<p className="text-sm text-gray-500">{info.subtitle}</p>
-				</div>{" "}
-			</div>{" "}
+				</div>
+			</div>
 			<div className="flex items-center space-x-2">
-				{" "}
 				<div className="text-right">
 					<p className={`font-semibold ${info.color}`}>
-						{tx.type === "income" ? "+" : "-"}
+						{info.amountPrefix}
 						{formatCurrency(tx.amount, currency)}
 					</p>
 					<p className="text-sm text-gray-500">
 						{new Date(tx.date + "T00:00:00").toLocaleDateString()}
 					</p>
-				</div>{" "}
-				<div className="relative">
-					{" "}
+				</div>
+				<div className="relative" ref={menuRef}>
 					<button
 						type="button"
 						onClick={() => setMenuOpen((o) => !o)}
 						className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"
 					>
 						<MoreVertical size={20} />
-					</button>{" "}
+					</button>
 					{menuOpen && (
-						<div className="absolute right-0 mt-2 w-32 bg-white dark:bg-gray-700 rounded-md shadow-lg z-10">
-							{" "}
+						<div className="absolute right-0 mt-2 w-32 bg-white dark:bg-gray-700 rounded-md shadow-lg z-20">
 							<button
 								type="button"
 								onClick={() => {
@@ -2590,7 +2738,7 @@ const TransactionItem = ({
 								className="flex items-center w-full px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-600"
 							>
 								<Edit size={16} className="mr-2" /> Edit
-							</button>{" "}
+							</button>
 							<button
 								type="button"
 								onClick={() => {
@@ -2600,17 +2748,16 @@ const TransactionItem = ({
 								className="flex items-center w-full px-4 py-2 text-sm text-red-500 hover:bg-gray-100 dark:hover:bg-gray-600"
 							>
 								<Trash2 size={16} className="mr-2" /> Delete
-							</button>{" "}
+							</button>
 						</div>
-					)}{" "}
-				</div>{" "}
-			</div>{" "}
+					)}
+				</div>
+			</div>
 		</div>
 	);
 };
 const BudgetsPage = ({ finTrackData, budgetModalControls, budgetDisplay }) => (
 	<div className="p-4 md:p-6 space-y-6">
-		{" "}
 		{finTrackData.budgets.map((budget) => (
 			<BudgetCard
 				key={budget.id}
@@ -2621,15 +2768,14 @@ const BudgetsPage = ({ finTrackData, budgetModalControls, budgetDisplay }) => (
 				currency={finTrackData.currency}
 				budgetDisplay={budgetDisplay}
 			/>
-		))}{" "}
+		))}
 		<button
 			type="button"
 			onClick={() => budgetModalControls.open()}
 			className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
 		>
-			{" "}
-			<Plus size={18} /> Add Budget{" "}
-		</button>{" "}
+			<Plus size={18} /> Add Budget
+		</button>
 	</div>
 );
 const BudgetCard = ({
@@ -2677,55 +2823,60 @@ const BudgetCard = ({
 			return <span className="text-xs">{remainingText}</span>;
 		return (
 			<div className="flex flex-col items-end">
-				{" "}
-				<span className="text-xs">{ratio}</span>{" "}
-				<span className="text-xs text-gray-500">{remainingText}</span>{" "}
+				<span className="text-xs">{ratio}</span>
+				<span className="text-xs text-gray-500">{remainingText}</span>
 			</div>
 		);
 	};
 	return (
 		<Card>
-			{" "}
 			<div className="flex justify-between items-start">
 				<div>
-					<h3 className="text-lg font-semibold mb-2">{budget.name}</h3>{" "}
+					<h3 className="text-lg font-semibold mb-2">{budget.name}</h3>
 					<p className="text-sm text-gray-500 mb-4">
 						{new Date(budget.startDate + "T00:00:00").toLocaleDateString()} -{" "}
 						{new Date(budget.endDate + "T00:00:00").toLocaleDateString()}
 					</p>
-				</div>{" "}
+				</div>
 				<div className="flex gap-2">
 					<button
 						type="button"
+						onClick={() => budgetModalControls.duplicate(budget.id)}
+						title="Duplicate Budget"
+					>
+						<Copy className="w-5 h-5 text-gray-500" />
+					</button>
+					<button
+						type="button"
 						onClick={() => budgetModalControls.edit(budget)}
+						title="Edit Budget"
 					>
 						<Edit className="w-5 h-5 text-gray-500" />
 					</button>
 					<button
 						type="button"
 						onClick={() => budgetModalControls.delete(budget.id)}
+						title="Delete Budget"
 					>
 						<Trash2 className="w-5 h-5 text-red-500" />
 					</button>
 				</div>
-			</div>{" "}
+			</div>
 			<div className="mb-4">
-				{" "}
 				<div className="flex justify-between mb-1">
 					<span className="text-sm font-medium">Overall Progress</span>
 					<div className="text-right">
 						{renderProgressText(budgetData.totalSpent, budgetData.totalBudget)}
 					</div>
-				</div>{" "}
+				</div>
 				<div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 mb-1">
 					<div
 						className="bg-indigo-600 h-4 rounded-full"
 						style={{ width: `${Math.min(overallPercentage, 100)}%` }}
 					></div>
 				</div>
-			</div>{" "}
+			</div>
 			<div className="space-y-3">
-				{" "}
 				{Object.entries(budget.categories).map(([cat, limit]) => {
 					const spent = budgetData.spentByCategory[cat] || 0;
 					const percentage = limit > 0 ? (spent / limit) * 100 : 0;
@@ -2733,9 +2884,7 @@ const BudgetCard = ({
 						(categories.expense && categories.expense[cat]) || {};
 					return (
 						<div key={cat}>
-							{" "}
 							<div className="flex justify-between items-center mb-1">
-								{" "}
 								<div className="flex items-center">
 									<CategoryIcon
 										name={categoryInfo.icon}
@@ -2744,11 +2893,11 @@ const BudgetCard = ({
 										style={{ color: categoryInfo.color }}
 									/>
 									<span className="text-sm font-medium">{cat}</span>
-								</div>{" "}
+								</div>
 								<div className="text-right">
 									{renderProgressText(spent, limit)}
-								</div>{" "}
-							</div>{" "}
+								</div>
+							</div>
 							<div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
 								<div
 									className="h-2 rounded-full"
@@ -2757,23 +2906,37 @@ const BudgetCard = ({
 										backgroundColor: categoryInfo.color || "#8B5CF6",
 									}}
 								></div>
-							</div>{" "}
+							</div>
 						</div>
 					);
-				})}{" "}
-			</div>{" "}
+				})}
+			</div>
 		</Card>
 	);
 };
 const AccountItem = ({
 	account,
-	calculatedBalance,
 	transactions,
 	accountModalControls,
 	currency,
 	onDelete,
+	navigate,
 }) => {
 	const [menuOpen, setMenuOpen] = useState(false);
+	const menuRef = useRef(null);
+
+	useEffect(() => {
+		const handleClickOutside = (event) => {
+			if (menuRef.current && !menuRef.current.contains(event.target)) {
+				setMenuOpen(false);
+			}
+		};
+		document.addEventListener("mousedown", handleClickOutside);
+		return () => {
+			document.removeEventListener("mousedown", handleClickOutside);
+		};
+	}, [menuRef]);
+
 	const { income, expenses } = useMemo(() => {
 		const now = new Date();
 		const startOfMonth = getStartOfMonth(now);
@@ -2783,18 +2946,27 @@ const AccountItem = ({
 		transactions
 			.filter((tx) => {
 				const txDate = new Date(tx.date + "T00:00:00");
-				return (
-					(tx.accountId === account.id ||
-						tx.to === account.id ||
-						tx.from === account.id) &&
-					txDate >= startOfMonth &&
-					txDate <= endOfMonth
-				);
+				const isRelated =
+					tx.accountId === account.id ||
+					tx.to === account.id ||
+					tx.from === account.id;
+				return isRelated && txDate >= startOfMonth && txDate <= endOfMonth;
 			})
 			.forEach((tx) => {
-				if (tx.type === "income" && tx.accountId === account.id) {
+				const isCorrection =
+					tx.category === "Balance Correction" ||
+					tx.category === "Balance Adjustment";
+				if (
+					tx.type === "income" &&
+					tx.accountId === account.id &&
+					!isCorrection
+				) {
 					income += tx.amount;
-				} else if (tx.type === "expense" && tx.accountId === account.id) {
+				} else if (
+					tx.type === "expense" &&
+					tx.accountId === account.id &&
+					!isCorrection
+				) {
 					expenses += tx.amount;
 				} else if (tx.type === "transfer") {
 					if (tx.to === account.id) income += tx.amount;
@@ -2802,98 +2974,78 @@ const AccountItem = ({
 				}
 			});
 		return { income, expenses };
-	}, [account.id, transactions, currency]);
-	const content = (
-		<div className="flex justify-between items-center p-4 w-full">
-			{" "}
-			<div>
-				{" "}
-				<p className="font-semibold text-gray-800 dark:text-gray-100">
-					{account.name}
-				</p>{" "}
-				<p className="text-sm text-gray-500 dark:text-gray-400">
-					{account.type}
-				</p>{" "}
-			</div>{" "}
-			<div className="text-right">
-				{" "}
-				<p className="text-lg font-bold text-gray-800 dark:text-gray-100">
-					{formatCurrency(calculatedBalance, currency)}
-				</p>{" "}
-				<p className="text-xs text-gray-400">
-					{" "}
-					<span className="text-green-500">
-						+{formatCurrency(income, currency)}
-					</span>{" "}
-					<span className="text-red-500 ml-2">
-						-{formatCurrency(expenses, currency)}
-					</span>{" "}
-				</p>{" "}
-			</div>{" "}
-		</div>
-	);
+	}, [account.id, transactions]);
+
 	return (
-		<div className="w-full">
-			{" "}
-			<div className="md:hidden">
-				{" "}
-				<SlideableAction
-					onEdit={() => accountModalControls.edit(account)}
-					onDelete={() => onDelete(account.id)}
+		<div className="flex items-center hover:bg-gray-50 dark:hover:bg-gray-700/50">
+			<div
+				className="flex-grow cursor-pointer"
+				onClick={() => navigate("accountDetail", account.id)}
+			>
+				<div className="flex justify-between items-center p-4 w-full">
+					<div>
+						<p className="font-semibold text-gray-800 dark:text-gray-100">
+							{account.name}
+						</p>
+						<p className="text-sm text-gray-500 dark:text-gray-400">
+							{account.type}
+						</p>
+					</div>
+					<div className="text-right">
+						<p className="text-lg font-bold text-gray-800 dark:text-gray-100">
+							{formatCurrency(account.balance, currency)}
+						</p>
+						<p className="text-xs text-gray-400">
+							<span className="text-green-500">
+								+{formatCurrency(income, currency)}
+							</span>
+							<span className="text-red-500 ml-2">
+								-{formatCurrency(expenses, currency)}
+							</span>
+						</p>
+					</div>
+				</div>
+			</div>
+			<div className="relative pr-4" ref={menuRef}>
+				<button
+					type="button"
+					onClick={() => setMenuOpen((o) => !o)}
+					className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"
 				>
-					{content}
-				</SlideableAction>{" "}
-			</div>{" "}
-			<div className="hidden md:flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-700/50">
-				{" "}
-				{content}{" "}
-				<div className="relative pr-4">
-					{" "}
-					<button
-						type="button"
-						onClick={() => setMenuOpen((o) => !o)}
-						className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"
-					>
-						<MoreVertical size={20} />
-					</button>{" "}
-					{menuOpen && (
-						<div className="absolute right-0 mt-2 w-32 bg-white dark:bg-gray-700 rounded-md shadow-lg z-10">
-							{" "}
-							<button
-								type="button"
-								onClick={() => {
-									accountModalControls.edit(account);
-									setMenuOpen(false);
-								}}
-								className="flex items-center w-full px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-600"
-							>
-								<Edit size={16} className="mr-2" /> Edit
-							</button>{" "}
-							<button
-								type="button"
-								onClick={() => {
-									onDelete(account.id);
-									setMenuOpen(false);
-								}}
-								className="flex items-center w-full px-4 py-2 text-sm text-red-500 hover:bg-gray-100 dark:hover:bg-gray-600"
-							>
-								<Trash2 size={16} className="mr-2" /> Delete
-							</button>{" "}
-						</div>
-					)}{" "}
-				</div>{" "}
-			</div>{" "}
+					<MoreVertical size={20} />
+				</button>
+				{menuOpen && (
+					<div className="absolute right-0 mt-2 w-32 bg-white dark:bg-gray-700 rounded-md shadow-lg z-20">
+						<button
+							type="button"
+							onClick={() => {
+								accountModalControls.edit(account);
+								setMenuOpen(false);
+							}}
+							className="flex items-center w-full px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-600"
+						>
+							<Edit size={16} className="mr-2" /> Edit
+						</button>
+						<button
+							type="button"
+							onClick={() => {
+								onDelete(account.id);
+								setMenuOpen(false);
+							}}
+							className="flex items-center w-full px-4 py-2 text-sm text-red-500 hover:bg-gray-100 dark:hover:bg-gray-600"
+						>
+							<Trash2 size={16} className="mr-2" /> Delete
+						</button>
+					</div>
+				)}
+			</div>
 		</div>
 	);
 };
-const AccountsPage = ({ finTrackData, accountModalControls }) => {
-	const {
-		accounts,
-		calculatedData,
-		transactions,
-		currency,
-		handleDeleteAccount,
-	} = finTrackData;
+
+const AccountsPage = ({ finTrackData, accountModalControls, navigate }) => {
+	const { accounts, transactions, currency, handleDeleteAccount } =
+		finTrackData;
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
 	const handleDeleteRequest = (accountId) => {
 		const account = accounts.find((a) => a.id === accountId);
@@ -2909,45 +3061,339 @@ const AccountsPage = ({ finTrackData, accountModalControls }) => {
 	};
 	return (
 		<div className="p-4 md:p-6 space-y-6">
-			{" "}
-			<div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
-				{" "}
+			<div className="bg-white dark:bg-gray-800 rounded-xl shadow-md">
 				<div className="divide-y divide-gray-200 dark:divide-gray-700">
-					{" "}
 					{accounts.map((account) => (
 						<AccountItem
 							key={account.id}
 							account={account}
-							calculatedBalance={
-								calculatedData.accountBalances[account.id] || 0
-							}
 							transactions={transactions}
 							accountModalControls={accountModalControls}
 							currency={currency}
 							onDelete={handleDeleteRequest}
+							navigate={navigate}
 						/>
-					))}{" "}
-				</div>{" "}
-			</div>{" "}
+					))}
+				</div>
+			</div>
 			<button
 				type="button"
 				onClick={() => accountModalControls.open()}
 				className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
 			>
-				{" "}
-				<Plus size={18} /> Add Account{" "}
-			</button>{" "}
+				<Plus size={18} /> Add Account
+			</button>
 			{deleteConfirm && (
 				<ConfirmationModal
 					{...deleteConfirm}
 					onClose={() => setDeleteConfirm(null)}
 				/>
-			)}{" "}
+			)}
 		</div>
 	);
 };
+
+const AccountDetailPage = ({ account, finTrackData, txModalControls }) => {
+	const { transactions, accounts, categories, currency } = finTrackData;
+	const [filterPeriod, setFilterPeriod] = useState("monthly");
+	const [referenceDate, setReferenceDate] = useState(new Date());
+	const [filter, setFilter] = useState({
+		startDate: formatDateForInput(getStartOfMonth(new Date())),
+		endDate: formatDateForInput(getEndOfMonth(new Date())),
+		type: "all",
+	});
+
+	useEffect(() => {
+		if (filterPeriod === "custom") return;
+		let start, end;
+		const ref = new Date(referenceDate);
+		switch (filterPeriod) {
+			case "daily":
+				start = getStartOfDay(ref);
+				end = getEndOfDay(ref);
+				break;
+			case "weekly":
+				start = getStartOfWeek(ref);
+				end = getEndOfWeek(ref);
+				break;
+			case "annually":
+				start = getStartOfYear(ref);
+				end = getEndOfYear(ref);
+				break;
+			case "monthly":
+			default:
+				start = getStartOfMonth(ref);
+				end = getEndOfMonth(ref);
+				break;
+		}
+		setFilter((prev) => ({
+			...prev,
+			startDate: formatDateForInput(start),
+			endDate: formatDateForInput(end),
+		}));
+	}, [filterPeriod, referenceDate]);
+
+	const handleFilterChange = (e) => {
+		const { name, value } = e.target;
+		setFilter((prev) => ({ ...prev, [name]: value }));
+	};
+	const handlePeriodChange = (period) => {
+		setFilterPeriod(period);
+		if (period !== "custom") {
+			setReferenceDate(new Date());
+		}
+	};
+	const handlePrev = () => {
+		const newDate = new Date(referenceDate);
+		switch (filterPeriod) {
+			case "daily":
+				newDate.setDate(newDate.getDate() - 1);
+				break;
+			case "weekly":
+				newDate.setDate(newDate.getDate() - 7);
+				break;
+			case "monthly":
+				newDate.setMonth(newDate.getMonth() - 1);
+				break;
+			case "annually":
+				newDate.setFullYear(newDate.getFullYear() - 1);
+				break;
+			default:
+				break;
+		}
+		setReferenceDate(newDate);
+	};
+	const handleNext = () => {
+		const newDate = new Date(referenceDate);
+		switch (filterPeriod) {
+			case "daily":
+				newDate.setDate(newDate.getDate() + 1);
+				break;
+			case "weekly":
+				newDate.setDate(newDate.getDate() + 7);
+				break;
+			case "monthly":
+				newDate.setMonth(newDate.getMonth() + 1);
+				break;
+			case "annually":
+				newDate.setFullYear(newDate.getFullYear() + 1);
+				break;
+			default:
+				break;
+		}
+		setReferenceDate(newDate);
+	};
+
+	const { filteredTransactions, totalDeposits, totalWithdrawals, netTotal } =
+		useMemo(() => {
+			const specialCategories = Object.keys(categories.special || {});
+			let deposits = 0;
+			let withdrawals = 0;
+
+			const transactionsInPeriod = transactions.filter((tx) => {
+				const txDate = new Date(tx.date + "T00:00:00");
+				const startDate = new Date(filter.startDate + "T00:00:00");
+				const endDate = new Date(filter.endDate + "T00:00:00");
+				return txDate >= startDate && txDate <= endDate;
+			});
+
+			const accountTransactions = transactionsInPeriod.filter((tx) => {
+				if (tx.type === "transfer") {
+					return tx.from === account.id || tx.to === account.id;
+				}
+				return tx.accountId === account.id;
+			});
+
+			accountTransactions.forEach((tx) => {
+				if (
+					tx.type === "income" ||
+					(tx.type === "transfer" && tx.to === account.id)
+				) {
+					deposits += tx.amount;
+				} else if (
+					tx.type === "expense" ||
+					(tx.type === "transfer" && tx.from === account.id)
+				) {
+					withdrawals += tx.amount;
+					if (tx.type === "transfer" && tx.fee) {
+						withdrawals += tx.fee;
+					}
+				}
+			});
+
+			const filteredList = accountTransactions
+				.filter((tx) => {
+					if (filter.type === "all") return true;
+					if (
+						(filter.type === "income" || filter.type === "expense") &&
+						specialCategories.includes(tx.category)
+					) {
+						return false;
+					}
+					return tx.type === filter.type;
+				})
+				.sort((a, b) => b.date.localeCompare(a.date));
+
+			return {
+				filteredTransactions: filteredList,
+				totalDeposits: deposits,
+				totalWithdrawals: withdrawals,
+				netTotal: deposits - withdrawals,
+			};
+		}, [transactions, filter, account.id, categories]);
+
+	return (
+		<div className="p-4 md:p-6 space-y-6">
+			<Card>
+				<div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+					<div>
+						<h3 className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
+							Deposits
+						</h3>
+						<p className="text-base md:text-lg font-semibold text-green-500">
+							{formatCurrency(totalDeposits, currency)}
+						</p>
+					</div>
+					<div>
+						<h3 className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
+							Withdrawals
+						</h3>
+						<p className="text-base md:text-lg font-semibold text-red-500">
+							{formatCurrency(totalWithdrawals, currency)}
+						</p>
+					</div>
+					<div>
+						<h3 className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
+							Net Total
+						</h3>
+						<p
+							className={`text-base md:text-lg font-semibold ${netTotal >= 0 ? "text-green-500" : "text-red-500"}`}
+						>
+							{formatCurrency(netTotal, currency)}
+						</p>
+					</div>
+					<div>
+						<h3 className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
+							Balance
+						</h3>
+						<p className="text-base md:text-lg font-semibold">
+							{formatCurrency(account.balance, currency)}
+						</p>
+					</div>
+				</div>
+			</Card>
+			<div className="bg-white dark:bg-gray-800 p-4 md:px-6 shadow-sm">
+				<div className="relative flex justify-center items-center gap-2 mb-4">
+					<button
+						onClick={handlePrev}
+						disabled={filterPeriod === "custom"}
+						className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+					>
+						<ChevronLeft className="h-5 w-5" />
+					</button>
+					<span className="font-semibold text-center w-auto sm:w-48 flex-shrink-0">
+						{formatRangeLabel(filterPeriod, referenceDate)}
+					</span>
+					<button
+						onClick={handleNext}
+						disabled={filterPeriod === "custom"}
+						className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+					>
+						<ChevronRight className="h-5 w-5" />
+					</button>
+					<button
+						onClick={() => handlePeriodChange("custom")}
+						className={`absolute top-0 right-0 p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 ${filterPeriod === "custom" ? "text-indigo-600" : ""}`}
+					>
+						<Filter size={20} />
+					</button>
+				</div>
+				<div className="flex justify-center flex-wrap gap-2 mb-4 border-b dark:border-gray-700 pb-4">
+					{["daily", "weekly", "monthly", "annually"].map((p) => (
+						<button
+							key={p}
+							onClick={() => handlePeriodChange(p)}
+							className={`px-3 py-1 text-sm rounded-full capitalize ${filterPeriod === p ? "bg-indigo-600 text-white" : "bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"}`}
+						>
+							{p}
+						</button>
+					))}
+				</div>
+				{filterPeriod === "custom" && (
+					<div className="grid grid-cols-2 gap-4 items-end mb-4">
+						<div>
+							<label
+								htmlFor="startDate"
+								className="text-sm font-medium text-gray-600 dark:text-gray-300"
+							>
+								Start Date
+							</label>
+							<input
+								type="date"
+								name="startDate"
+								id="startDate"
+								value={filter.startDate}
+								onChange={handleFilterChange}
+								className="mt-1 w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+							/>
+						</div>
+						<div>
+							<label
+								htmlFor="endDate"
+								className="text-sm font-medium text-gray-600 dark:text-gray-300"
+							>
+								End Date
+							</label>
+							<input
+								type="date"
+								name="endDate"
+								id="endDate"
+								value={filter.endDate}
+								onChange={handleFilterChange}
+								className="mt-1 w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+							/>
+						</div>
+					</div>
+				)}
+				<div className="grid grid-cols-1 gap-4 items-end">
+					<div>
+						<label
+							htmlFor="type"
+							className="text-sm font-medium text-gray-600 dark:text-gray-300"
+						>
+							Type
+						</label>
+						<select
+							name="type"
+							id="type"
+							value={filter.type}
+							onChange={handleFilterChange}
+							className="mt-1 w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+						>
+							<option value="all">All</option>
+							<option value="income">Income</option>
+							<option value="expense">Expense</option>
+							<option value="transfer">Transfer</option>
+						</select>
+					</div>
+				</div>
+			</div>
+			<div className="p-4 md:p-6 md:pt-0">
+				<TransactionList
+					title="Transactions"
+					transactions={filteredTransactions}
+					txModalControls={txModalControls}
+					accounts={accounts}
+					categories={categories}
+					currency={currency}
+					contextAccountId={account.id}
+				/>
+			</div>
+		</div>
+	);
+};
+
 const SettingsPage = ({
-	finTrackData,
 	theme,
 	setTheme,
 	currency,
@@ -2959,10 +3405,10 @@ const SettingsPage = ({
 	monthStartsOn,
 	setMonthStartsOn,
 	navigate,
+	onDataManagementClick,
 }) => {
 	return (
 		<div className="p-4 md:p-6 space-y-6">
-			{" "}
 			<AppearanceSettings
 				theme={theme}
 				setTheme={setTheme}
@@ -2970,38 +3416,40 @@ const SettingsPage = ({
 				setCurrency={setCurrency}
 				budgetDisplay={budgetDisplay}
 				setBudgetDisplay={setBudgetDisplay}
-			/>{" "}
+			/>
 			<GeneralSettings
 				weekStartsOn={weekStartsOn}
 				setWeekStartsOn={setWeekStartsOn}
 				monthStartsOn={monthStartsOn}
 				setMonthStartsOn={setMonthStartsOn}
-			/>{" "}
+			/>
 			<Card>
-				{" "}
-				<h3 className="text-lg font-semibold mb-4">Management</h3>{" "}
+				<h3 className="text-lg font-semibold mb-4">Management</h3>
 				<div className="space-y-3">
-					{" "}
 					<ManagementButton
 						onClick={() => navigate("manageAccounts")}
 						icon={Wallet}
 						label="Manage Accounts"
-					/>{" "}
+					/>
 					<ManagementButton
 						onClick={() => navigate("manageCategories")}
 						icon={BarChart2}
 						label="Manage Categories"
-					/>{" "}
+					/>
 					<ManagementButton
 						onClick={() => navigate("manageRecurring")}
 						icon={Repeat}
 						label="Recurring Transactions"
-					/>{" "}
-				</div>{" "}
-			</Card>{" "}
-			<DataManagement finTrackData={finTrackData} onError={() => {}} />{" "}
+					/>
+					<ManagementButton
+						onClick={onDataManagementClick}
+						icon={Database}
+						label="Data Management"
+					/>
+				</div>
+			</Card>
 			<div className="text-center text-xs text-gray-400 dark:text-gray-500 mt-4">
-				Version: {import.meta.env.VITE_APP_VERSION}
+				Version: 1.0.1
 			</div>
 		</div>
 	);
@@ -3011,23 +3459,20 @@ const ManagementButton = ({ onClick, icon: Icon, label }) => (
 		onClick={onClick}
 		className="w-full flex justify-between items-center p-4 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
 	>
-		{" "}
 		<div className="flex items-center gap-3">
-			{" "}
-			<Icon className="w-5 h-5 text-gray-600 dark:text-gray-300" />{" "}
-			<span className="font-semibold">{label}</span>{" "}
-		</div>{" "}
-		<ChevronRight className="w-5 h-5 text-gray-400" />{" "}
+			<Icon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+			<span className="font-semibold">{label}</span>
+		</div>
+		<ChevronRight className="w-5 h-5 text-gray-400" />
 	</button>
 );
-const ManageAccountsPage = ({ finTrackData, accountModalControls }) => {
-	const {
-		accounts,
-		calculatedData,
-		transactions,
-		currency,
-		handleDeleteAccount,
-	} = finTrackData;
+const ManageAccountsPage = ({
+	finTrackData,
+	accountModalControls,
+	navigate,
+}) => {
+	const { accounts, transactions, currency, handleDeleteAccount } =
+		finTrackData;
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
 	const handleDeleteRequest = (accountId) => {
 		const account = accounts.find((a) => a.id === accountId);
@@ -3043,48 +3488,38 @@ const ManageAccountsPage = ({ finTrackData, accountModalControls }) => {
 	};
 	return (
 		<div className="p-4 md:p-6 space-y-6">
-			{" "}
-			<div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
-				{" "}
+			<div className="bg-white dark:bg-gray-800 rounded-xl shadow-md">
 				<div className="divide-y divide-gray-200 dark:divide-gray-700">
-					{" "}
 					{accounts.map((account) => (
 						<AccountItem
 							key={account.id}
 							account={account}
-							calculatedBalance={
-								calculatedData.accountBalances[account.id] || 0
-							}
 							transactions={transactions}
 							accountModalControls={accountModalControls}
 							currency={currency}
 							onDelete={handleDeleteRequest}
+							navigate={navigate}
 						/>
-					))}{" "}
-				</div>{" "}
-			</div>{" "}
+					))}
+				</div>
+			</div>
 			<button
 				type="button"
 				onClick={() => accountModalControls.open()}
 				className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
 			>
-				{" "}
-				<Plus size={18} /> Add Account{" "}
-			</button>{" "}
+				<Plus size={18} /> Add Account
+			</button>
 			{deleteConfirm && (
 				<ConfirmationModal
 					{...deleteConfirm}
 					onClose={() => setDeleteConfirm(null)}
 				/>
-			)}{" "}
+			)}
 		</div>
 	);
 };
-const ManageCategoriesPage = ({
-	finTrackData,
-	categoryModalControls,
-	onError,
-}) => {
+const ManageCategoriesPage = ({ finTrackData, categoryModalControls }) => {
 	const { categories, handleDeleteCategory } = finTrackData;
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
 	const [activeTab, setActiveTab] = useState("expense");
@@ -3102,60 +3537,52 @@ const ManageCategoriesPage = ({
 	const currentCategories = categories[activeTab] || {};
 	return (
 		<div className="p-4 md:p-6 space-y-6">
-			{" "}
 			<div className="flex border-b border-gray-200 dark:border-gray-700">
-				{" "}
 				<button
 					onClick={() => setActiveTab("expense")}
 					className={`px-4 py-2 text-sm font-medium ${activeTab === "expense" ? "border-b-2 border-indigo-500 text-indigo-600" : "text-gray-500"}`}
 				>
 					Expense
-				</button>{" "}
+				</button>
 				<button
 					onClick={() => setActiveTab("income")}
 					className={`px-4 py-2 text-sm font-medium ${activeTab === "income" ? "border-b-2 border-indigo-500 text-indigo-600" : "text-gray-500"}`}
 				>
 					Income
-				</button>{" "}
-			</div>{" "}
+				</button>
+			</div>
 			<Card>
-				{" "}
 				<div className="flex justify-between items-center mb-4">
-					{" "}
 					<h3 className="text-lg font-semibold capitalize">
 						{activeTab} Categories
-					</h3>{" "}
+					</h3>
 					<button
 						type="button"
 						onClick={() => categoryModalControls.open(null, activeTab)}
 						className="p-2 bg-indigo-600 text-white rounded-md"
 					>
 						<Plus className="h-5 w-5" />
-					</button>{" "}
-				</div>{" "}
+					</button>
+				</div>
 				<div className="space-y-2">
-					{" "}
 					{Object.entries(currentCategories).map(
 						([catName, { icon, color, type }]) => (
 							<div
 								key={catName}
 								className="flex items-center p-3 bg-gray-100 dark:bg-gray-700 rounded-md"
 							>
-								{" "}
 								<div
 									className="w-8 h-8 flex items-center justify-center rounded-full mr-3"
 									style={{ backgroundColor: color }}
 								>
-									{" "}
 									<CategoryIcon
 										name={icon}
 										type={type}
 										className="w-5 h-5 text-white"
-									/>{" "}
-								</div>{" "}
-								<span className="flex-grow">{catName}</span>{" "}
+									/>
+								</div>
+								<span className="flex-grow">{catName}</span>
 								<div className="flex items-center gap-2">
-									{" "}
 									<button
 										type="button"
 										onClick={() =>
@@ -3168,36 +3595,44 @@ const ManageCategoriesPage = ({
 										className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full"
 									>
 										<Edit className="w-5 h-5 text-gray-500" />
-									</button>{" "}
+									</button>
 									<button
 										type="button"
 										onClick={() => handleDeleteRequest(catName, activeTab)}
 										className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full"
 									>
 										<Trash2 className="w-5 h-5 text-red-500" />
-									</button>{" "}
-								</div>{" "}
+									</button>
+								</div>
 							</div>
 						),
-					)}{" "}
-				</div>{" "}
-			</Card>{" "}
+					)}
+				</div>
+			</Card>
 			{showDeleteConfirm && (
 				<ConfirmationModal
 					{...showDeleteConfirm}
 					onClose={() => setShowDeleteConfirm(null)}
 				/>
-			)}{" "}
+			)}
 		</div>
 	);
 };
-const DataManagement = ({ finTrackData, onError }) => {
-	const { setAccounts, setBudgets, setTransactions, setCategories } =
-		finTrackData;
+const DataManagementModal = ({ isOpen, onClose, finTrackData, onError }) => {
+	const {
+		setAccounts,
+		setBudgets,
+		setTransactions,
+		setCategories,
+		setRecurringTransactions,
+	} = finTrackData;
 	const [showReset, setShowReset] = useState(false);
 	const [showImportConfirm, setShowImportConfirm] = useState(false);
+	const [showCsvConfirm, setShowCsvConfirm] = useState(false);
 	const [dataToImport, setDataToImport] = useState(null);
-	const fileInputRef = useRef(null);
+	const [csvData, setCsvData] = useState(null);
+	const jsonInputRef = useRef(null);
+	const csvInputRef = useRef(null);
 
 	const handleExport = async () => {
 		const db = await initDB();
@@ -3210,6 +3645,13 @@ const DataManagement = ({ finTrackData, onError }) => {
 					income: catData.income,
 					special: catData.special,
 				};
+			} else if (storeName === "accounts") {
+				const accountsData = await db.getAll(storeName);
+				// Force balance to 0 on export to ensure recalculation on import
+				allData[storeName] = accountsData.map((acc) => ({
+					...acc,
+					balance: 0,
+				}));
 			} else {
 				allData[storeName] = await db.getAll(storeName);
 			}
@@ -3221,7 +3663,7 @@ const DataManagement = ({ finTrackData, onError }) => {
 		link.click();
 	};
 
-	const handleFileChange = (event) => {
+	const handleJsonFileChange = (event) => {
 		const file = event.target.files[0];
 		if (!file) return;
 		const reader = new FileReader();
@@ -3247,39 +3689,171 @@ const DataManagement = ({ finTrackData, onError }) => {
 		event.target.value = null;
 	};
 
-	const confirmImport = async () => {
+	const confirmJsonImport = async () => {
 		if (!dataToImport) return;
+
+		// 1. Recalculate balances from transactions
+		const balances = {};
+		dataToImport.accounts.forEach((acc) => {
+			// Always start from a balance of 0 to ensure it's purely based on transactions.
+			balances[acc.id] = 0;
+		});
+
+		const sortedTransactions = [...dataToImport.transactions].sort(
+			(a, b) => new Date(a.date) - new Date(b.date),
+		);
+
+		sortedTransactions.forEach((tx) => {
+			if (tx.type === "income") {
+				if (balances[tx.accountId] !== undefined) {
+					balances[tx.accountId] += tx.amount;
+				}
+			} else if (tx.type === "expense") {
+				if (balances[tx.accountId] !== undefined) {
+					balances[tx.accountId] -= tx.amount;
+				}
+			} else if (tx.type === "transfer") {
+				if (balances[tx.from] !== undefined) {
+					balances[tx.from] -= tx.amount + (tx.fee || 0);
+				}
+				if (balances[tx.to] !== undefined) {
+					balances[tx.to] += tx.amount;
+				}
+			}
+		});
+
+		const recalculatedAccounts = dataToImport.accounts.map((acc) => ({
+			...acc,
+			balance: balances[acc.id] || 0,
+		}));
+
+		// 2. Write recalculated data to DB
 		const db = await initDB();
-		const tx = db.transaction(STORES, "readwrite");
+		const dbTx = db.transaction(STORES, "readwrite");
+		await Promise.all(STORES.map((name) => dbTx.objectStore(name).clear()));
 		await Promise.all([
-			tx.objectStore("accounts").clear(),
-			tx.objectStore("transactions").clear(),
-			tx.objectStore("budgets").clear(),
-			tx.objectStore("categories").clear(),
-		]);
-		await Promise.all([
-			...dataToImport.accounts.map((item) =>
-				tx.objectStore("accounts").put(item),
+			...recalculatedAccounts.map((item) =>
+				dbTx.objectStore("accounts").put(item),
 			),
 			...dataToImport.transactions.map((item) =>
-				tx.objectStore("transactions").put(item),
+				dbTx.objectStore("transactions").put(item),
 			),
 			...dataToImport.budgets.map((item) =>
-				tx.objectStore("budgets").put(item),
+				dbTx.objectStore("budgets").put(item),
 			),
-			tx
+			dbTx
 				.objectStore("categories")
 				.put({ id: "main", ...dataToImport.categories }),
+			...(dataToImport.recurringTransactions || []).map((item) =>
+				dbTx.objectStore("recurringTransactions").put(item),
+			),
 		]);
-		await tx.done;
+		await dbTx.done;
 
-		const cleanedData = validateAndCleanData(dataToImport);
+		// 3. Update app state
+		const cleanedData = validateAndCleanData({
+			...dataToImport,
+			accounts: recalculatedAccounts,
+		});
+
 		setAccounts(cleanedData.accounts);
 		setTransactions(cleanedData.transactions);
 		setBudgets(cleanedData.budgets);
 		setCategories(cleanedData.categories);
+		setRecurringTransactions(cleanedData.recurringTransactions || []);
+
 		setShowImportConfirm(false);
 		setDataToImport(null);
+		onClose();
+	};
+
+	const handleCsvFileChange = (event) => {
+		const file = event.target.files[0];
+		if (!file) return;
+		const reader = new FileReader();
+		reader.onload = (e) => {
+			try {
+				const text = e.target.result;
+				const { data, errors } = parseCsv(text);
+				if (errors.length > 0) {
+					onError(`CSV parsing errors: ${errors.join(", ")}`);
+					return;
+				}
+				setCsvData(data);
+				setShowCsvConfirm(true);
+			} catch (err) {
+				onError("Failed to parse CSV file.");
+			}
+		};
+		reader.readAsText(file);
+		event.target.value = null;
+	};
+
+	const parseCsv = (csvText) => {
+		const lines = csvText.trim().split(/\r?\n/);
+		if (lines.length < 2) {
+			return {
+				data: [],
+				errors: ["CSV must have a header and at least one data row."],
+			};
+		}
+		const headers = lines[0].split(",").map((h) => h.trim());
+		const data = [];
+		const errors = [];
+
+		const requiredHeaders = [
+			"date",
+			"amount",
+			"description",
+			"type",
+			"category",
+		];
+		for (const required of requiredHeaders) {
+			if (!headers.includes(required)) {
+				errors.push(`Missing required header: ${required}`);
+			}
+		}
+		if (errors.length > 0) return { data: [], errors };
+
+		for (let i = 1; i < lines.length; i++) {
+			const values = lines[i].split(",");
+			const row = headers.reduce((obj, header, index) => {
+				obj[header] = values[index]?.trim();
+				return obj;
+			}, {});
+			data.push(row);
+		}
+		return { data, errors };
+	};
+
+	const confirmCsvImport = () => {
+		if (!csvData) return;
+		const defaultAccountId = finTrackData.accounts[0]?.id;
+		if (!defaultAccountId) {
+			onError("No default account available to import transactions.");
+			return;
+		}
+
+		csvData.forEach((row, index) => {
+			let finalCategory = row.category;
+			if (row.description.trim().toLowerCase() === "difference") {
+				finalCategory = "Balance Adjustment";
+			}
+			const newTx = {
+				id: `tx-${Date.now()}-${index}`,
+				accountId: defaultAccountId,
+				amount: parseFloat(row.amount),
+				date: formatDateForInput(new Date(row.date)),
+				description: row.description,
+				type: row.type,
+				category: finalCategory,
+			};
+			finTrackData.handleSaveTransaction(newTx);
+		});
+
+		setShowCsvConfirm(false);
+		setCsvData(null);
+		onClose();
 	};
 
 	const resetData = async () => {
@@ -3297,6 +3871,9 @@ const DataManagement = ({ finTrackData, onError }) => {
 			tx
 				.objectStore("categories")
 				.put({ id: "main", ...initialData.categories }),
+			...initialData.recurringTransactions.map((item) =>
+				tx.objectStore("recurringTransactions").put(item),
+			),
 		]);
 		await tx.done;
 
@@ -3304,59 +3881,94 @@ const DataManagement = ({ finTrackData, onError }) => {
 		setTransactions(initialData.transactions);
 		setBudgets(initialData.budgets);
 		setCategories(initialData.categories);
+		setRecurringTransactions(initialData.recurringTransactions || []);
 		setShowReset(false);
+		onClose();
 	};
 
+	if (!isOpen) return null;
+
 	return (
-		<Card>
-			{" "}
-			<h3 className="text-lg font-semibold mb-4">Data Management</h3>{" "}
-			<div className="space-y-3">
-				{" "}
-				<input
-					type="file"
-					ref={fileInputRef}
-					onChange={handleFileChange}
-					className="hidden"
-					accept=".json"
-				/>{" "}
-				<button
-					type="button"
-					onClick={handleExport}
-					className="w-full p-3 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-2"
-				>
-					<Download className="h-5 w-5" /> Export Data
-				</button>{" "}
-				<button
-					type="button"
-					onClick={() => fileInputRef.current.click()}
-					className="w-full p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
-				>
-					<Upload className="h-5 w-5" /> Import Data
-				</button>{" "}
-				<button
-					type="button"
-					onClick={() => setShowReset(true)}
-					className="w-full p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center justify-center gap-2"
-				>
-					<RefreshCw className="h-5 w-5" /> Reset All Data
-				</button>{" "}
-			</div>{" "}
-			<ConfirmationModal
-				isOpen={showReset}
-				onClose={() => setShowReset(false)}
-				onConfirm={resetData}
-				title="Reset All Data"
-				message="Are you sure? This will delete all data and restore the app to its initial state."
-			/>{" "}
-			<ConfirmationModal
-				isOpen={showImportConfirm}
-				onClose={() => setShowImportConfirm(false)}
-				onConfirm={confirmImport}
-				title="Import Data"
-				message="Are you sure you want to import data? This will overwrite all your current data."
-			/>{" "}
-		</Card>
+		<div
+			className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4"
+			onClick={(e) => {
+				if (e.target === e.currentTarget) onClose();
+			}}
+		>
+			<Card className="w-full max-w-md">
+				<div className="flex justify-between items-center mb-4">
+					<h3 className="text-lg font-semibold">Data Management</h3>
+					<button type="button" onClick={onClose}>
+						<X />
+					</button>
+				</div>
+				<div className="space-y-3">
+					<input
+						type="file"
+						ref={jsonInputRef}
+						onChange={handleJsonFileChange}
+						className="hidden"
+						accept=".json"
+					/>
+					<input
+						type="file"
+						ref={csvInputRef}
+						onChange={handleCsvFileChange}
+						className="hidden"
+						accept=".csv"
+					/>
+					<button
+						type="button"
+						onClick={handleExport}
+						className="w-full p-3 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-2"
+					>
+						<Download className="h-5 w-5" /> Export Data
+					</button>
+					<button
+						type="button"
+						onClick={() => jsonInputRef.current.click()}
+						className="w-full p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
+					>
+						<Upload className="h-5 w-5" /> Import from Backup (.json)
+					</button>
+					<button
+						type="button"
+						onClick={() => csvInputRef.current.click()}
+						className="w-full p-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 flex items-center justify-center gap-2"
+					>
+						<Upload className="h-5 w-5" /> Import Transactions (.csv)
+					</button>
+					<button
+						type="button"
+						onClick={() => setShowReset(true)}
+						className="w-full p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center justify-center gap-2"
+					>
+						<RefreshCw className="h-5 w-5" /> Reset All Data
+					</button>
+				</div>
+				<ConfirmationModal
+					isOpen={showReset}
+					onClose={() => setShowReset(false)}
+					onConfirm={resetData}
+					title="Reset All Data"
+					message="Are you sure? This will delete all data and restore it to the initial state."
+				/>
+				<ConfirmationModal
+					isOpen={showImportConfirm}
+					onClose={() => setShowImportConfirm(false)}
+					onConfirm={confirmJsonImport}
+					title="Import Data"
+					message="This will overwrite all current data. Are you sure?"
+				/>
+				<ConfirmationModal
+					isOpen={showCsvConfirm}
+					onClose={() => setShowCsvConfirm(false)}
+					onConfirm={confirmCsvImport}
+					title="Import CSV Transactions"
+					message={`Are you sure you want to import ${csvData?.length} transactions? They will be added to your current data.`}
+				/>
+			</Card>
+		</div>
 	);
 };
 const AppearanceSettings = ({
@@ -3368,69 +3980,59 @@ const AppearanceSettings = ({
 	setBudgetDisplay,
 }) => (
 	<Card>
-		{" "}
-		<h3 className="text-lg font-semibold mb-4">Appearance</h3>{" "}
+		<h3 className="text-lg font-semibold mb-4">Appearance</h3>
 		<div className="space-y-4">
-			{" "}
 			<div>
-				{" "}
-				<label className="text-gray-700 dark:text-gray-300">Theme</label>{" "}
+				<label className="text-gray-700 dark:text-gray-300">Theme</label>
 				<div className="flex justify-between items-center mt-2 rounded-lg bg-gray-100 dark:bg-gray-700 p-1">
-					{" "}
 					{["light", "dark", "system"].map((opt) => (
 						<button
 							key={opt}
 							onClick={() => setTheme(opt)}
 							className={`w-full text-center text-sm capitalize px-3 py-1 rounded-md transition-colors ${theme === opt ? "bg-white dark:bg-gray-600 shadow" : "text-gray-500 dark:text-gray-300"}`}
 						>
-							{" "}
-							{opt}{" "}
+							{opt}
 						</button>
-					))}{" "}
-				</div>{" "}
-			</div>{" "}
+					))}
+				</div>
+			</div>
 			<div className="flex items-center justify-between">
-				{" "}
 				<label
 					htmlFor="currency-select"
 					className="text-gray-700 dark:text-gray-300"
 				>
 					Currency
-				</label>{" "}
+				</label>
 				<select
 					id="currency-select"
 					value={currency}
 					onChange={(e) => setCurrency(e.target.value)}
 					className="p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
 				>
-					{" "}
 					{Object.keys(currencyMap).map((key) => (
 						<option key={key} value={key}>
 							{key} ({currencyMap[key]})
 						</option>
-					))}{" "}
-				</select>{" "}
-			</div>{" "}
+					))}
+				</select>
+			</div>
 			<div>
-				{" "}
 				<label className="text-gray-700 dark:text-gray-300">
 					Budget Display
-				</label>{" "}
+				</label>
 				<div className="flex justify-between items-center mt-2 rounded-lg bg-gray-100 dark:bg-gray-700 p-1">
-					{" "}
 					{["ratio", "remaining", "both"].map((opt) => (
 						<button
 							key={opt}
 							onClick={() => setBudgetDisplay(opt)}
 							className={`w-full text-center text-sm capitalize px-3 py-1 rounded-md transition-colors ${budgetDisplay === opt ? "bg-white dark:bg-gray-600 shadow" : "text-gray-500 dark:text-gray-300"}`}
 						>
-							{" "}
-							{opt}{" "}
+							{opt}
 						</button>
-					))}{" "}
-				</div>{" "}
-			</div>{" "}
-		</div>{" "}
+					))}
+				</div>
+			</div>
+		</div>
 	</Card>
 );
 const GeneralSettings = ({
@@ -3440,38 +4042,33 @@ const GeneralSettings = ({
 	setMonthStartsOn,
 }) => (
 	<Card>
-		{" "}
-		<h3 className="text-lg font-semibold mb-4">General</h3>{" "}
+		<h3 className="text-lg font-semibold mb-4">General</h3>
 		<div className="space-y-4">
-			{" "}
 			<div className="flex items-center justify-between">
-				{" "}
 				<label
 					htmlFor="week-start-select"
 					className="text-gray-700 dark:text-gray-300"
 				>
 					Week Starts On
-				</label>{" "}
+				</label>
 				<select
 					id="week-start-select"
 					value={weekStartsOn}
 					onChange={(e) => setWeekStartsOn(e.target.value)}
 					className="p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
 				>
-					{" "}
-					<option value="Sunday">Sunday</option>{" "}
-					<option value="Monday">Monday</option>{" "}
-					<option value="Saturday">Saturday</option>{" "}
-				</select>{" "}
-			</div>{" "}
+					<option value="Sunday">Sunday</option>
+					<option value="Monday">Monday</option>
+					<option value="Saturday">Saturday</option>
+				</select>
+			</div>
 			<div className="flex items-center justify-between">
-				{" "}
 				<label
 					htmlFor="month-start-input"
 					className="text-gray-700 dark:text-gray-300"
 				>
 					Month Start Day
-				</label>{" "}
+				</label>
 				<input
 					id="month-start-input"
 					type="number"
@@ -3480,9 +4077,9 @@ const GeneralSettings = ({
 					min="1"
 					max="28"
 					className="w-20 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-				/>{" "}
-			</div>{" "}
-		</div>{" "}
+				/>
+			</div>
+		</div>
 	</Card>
 );
 const ManageRecurringPage = ({ finTrackData, recurringModalControls }) => {
@@ -3503,63 +4100,55 @@ const ManageRecurringPage = ({ finTrackData, recurringModalControls }) => {
 	};
 	return (
 		<div className="p-4 md:p-6 space-y-6">
-			{" "}
 			<Card>
-				{" "}
 				<div className="space-y-2">
-					{" "}
 					{recurringTransactions.map((recTx) => (
 						<div
 							key={recTx.id}
 							className="flex items-center justify-between p-3 bg-gray-100 dark:bg-gray-700 rounded-md"
 						>
-							{" "}
 							<div className="flex items-center gap-3">
-								{" "}
-								<Repeat className="w-5 h-5 text-indigo-500" />{" "}
+								<Repeat className="w-5 h-5 text-indigo-500" />
 								<div>
-									{" "}
-									<p className="font-semibold">{recTx.description}</p>{" "}
+									<p className="font-semibold">{recTx.description}</p>
 									<p className="text-sm text-gray-500 capitalize">
 										{recTx.frequency} &bull; {formatCurrency(recTx.amount)}
-									</p>{" "}
-								</div>{" "}
-							</div>{" "}
+									</p>
+								</div>
+							</div>
 							<div className="flex items-center gap-2">
-								{" "}
 								<button
 									type="button"
 									onClick={() => recurringModalControls.edit(recTx)}
 									className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full"
 								>
 									<Edit className="w-5 h-5 text-gray-500" />
-								</button>{" "}
+								</button>
 								<button
 									type="button"
 									onClick={() => handleDeleteRequest(recTx.id)}
 									className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full"
 								>
 									<Trash2 className="w-5 h-5 text-red-500" />
-								</button>{" "}
-							</div>{" "}
+								</button>
+							</div>
 						</div>
-					))}{" "}
-				</div>{" "}
-			</Card>{" "}
+					))}
+				</div>
+			</Card>
 			<button
 				type="button"
 				onClick={() => recurringModalControls.open()}
 				className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
 			>
-				{" "}
-				<Plus size={18} /> Add Recurring Transaction{" "}
-			</button>{" "}
+				<Plus size={18} /> Add Recurring Transaction
+			</button>
 			{deleteConfirm && (
 				<ConfirmationModal
 					{...deleteConfirm}
 					onClose={() => setDeleteConfirm(null)}
 				/>
-			)}{" "}
+			)}
 		</div>
 	);
 };
@@ -3644,71 +4233,62 @@ const RecurringTransactionModal = ({
 				if (e.target === e.currentTarget) onClose();
 			}}
 		>
-			{" "}
 			<Card className="w-full max-w-md">
-				{" "}
 				<div className="flex justify-between items-center mb-4">
-					{" "}
 					<h2 className="text-lg font-semibold">
 						{isEditMode ? "Edit" : "Add"} Recurring Transaction
-					</h2>{" "}
+					</h2>
 					<button type="button" onClick={onClose}>
 						<X className="h-6 w-6" />
-					</button>{" "}
-				</div>{" "}
+					</button>
+				</div>
 				<form onSubmit={handleSubmit} className="space-y-4">
-					{" "}
 					<div className="flex items-center gap-4">
-						{" "}
-						<label className="w-24">Type</label>{" "}
+						<label className="w-24">Type</label>
 						<div className="flex-grow flex justify-center border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
-							{" "}
 							<button
 								type="button"
 								onClick={() => setType("income")}
 								className={`flex-1 py-2 text-sm font-semibold capitalize transition-colors ${type === "income" ? "bg-green-600 text-white" : "bg-transparent text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"}`}
 							>
 								Income
-							</button>{" "}
+							</button>
 							<button
 								type="button"
 								onClick={() => setType("expense")}
 								className={`flex-1 py-2 text-sm font-semibold capitalize transition-colors ${type === "expense" ? "bg-red-600 text-white" : "bg-transparent text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"}`}
 							>
 								Expense
-							</button>{" "}
-						</div>{" "}
-					</div>{" "}
+							</button>
+						</div>
+					</div>
 					<div className="flex items-center gap-4">
-						{" "}
 						<label htmlFor="rec-desc" className="w-24">
 							Description
-						</label>{" "}
+						</label>
 						<input
 							id="rec-desc"
 							type="text"
 							value={description}
 							onChange={(e) => setDescription(e.target.value)}
 							className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-						/>{" "}
-					</div>{" "}
+						/>
+					</div>
 					<div className="flex items-center gap-4">
-						{" "}
 						<label htmlFor="rec-amount" className="w-24">
 							Amount
-						</label>{" "}
+						</label>
 						<CalculatorInput
 							id="rec-amount"
 							value={amount}
 							onChange={(e) => setAmount(e.target.value)}
 							placeholder="0.00"
-						/>{" "}
-					</div>{" "}
+						/>
+					</div>
 					<div className="flex items-center gap-4">
-						{" "}
 						<label htmlFor="rec-category" className="w-24">
 							Category
-						</label>{" "}
+						</label>
 						<select
 							id="rec-category"
 							value={category}
@@ -3720,13 +4300,12 @@ const RecurringTransactionModal = ({
 									{c}
 								</option>
 							))}
-						</select>{" "}
-					</div>{" "}
+						</select>
+					</div>
 					<div className="flex items-center gap-4">
-						{" "}
 						<label htmlFor="rec-account" className="w-24">
 							Account
-						</label>{" "}
+						</label>
 						<select
 							id="rec-account"
 							value={accountId}
@@ -3738,47 +4317,44 @@ const RecurringTransactionModal = ({
 									{a.name}
 								</option>
 							))}
-						</select>{" "}
-					</div>{" "}
+						</select>
+					</div>
 					<div className="flex items-center gap-4">
-						{" "}
 						<label htmlFor="rec-frequency" className="w-24">
 							Frequency
-						</label>{" "}
+						</label>
 						<select
 							id="rec-frequency"
 							value={frequency}
 							onChange={(e) => setFrequency(e.target.value)}
 							className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
 						>
-							{" "}
-							<option value="Daily">Daily</option>{" "}
-							<option value="Weekly">Weekly</option>{" "}
-							<option value="Monthly">Monthly</option>{" "}
-							<option value="Annually">Annually</option>{" "}
-						</select>{" "}
-					</div>{" "}
+							<option value="Daily">Daily</option>
+							<option value="Weekly">Weekly</option>
+							<option value="Monthly">Monthly</option>
+							<option value="Annually">Annually</option>
+						</select>
+					</div>
 					<div className="flex items-center gap-4">
-						{" "}
 						<label htmlFor="rec-start-date" className="w-24">
 							Start Date
-						</label>{" "}
+						</label>
 						<input
 							id="rec-start-date"
 							type="date"
 							value={startDate}
 							onChange={(e) => setStartDate(e.target.value)}
 							className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-						/>{" "}
-					</div>{" "}
+						/>
+					</div>
 					<button
 						type="submit"
 						className="w-full bg-indigo-600 text-white font-semibold p-3 rounded-lg hover:bg-indigo-700 mt-6"
 					>
 						{isEditMode ? "Save Changes" : "Add Recurring"}
-					</button>{" "}
-				</form>{" "}
-			</Card>{" "}
+					</button>
+				</form>
+			</Card>
 		</div>
 	);
 };
@@ -3786,12 +4362,14 @@ const RecurringTransactionModal = ({
 // --- MAIN APP COMPONENT ---
 export default function App() {
 	const [activeView, setActiveView] = useState("dashboard");
+	const [viewingAccountId, setViewingAccountId] = useState(null);
 	const [viewHistory, setViewHistory] = useState(["dashboard"]);
 	const finTrackData = useFinTrack();
 	const [txModalState, setTxModalState] = useState({
 		open: false,
 		edit: null,
 		delete: null,
+		isCorrection: false,
 	});
 	const [budgetModalState, setBudgetModalState] = useState({
 		open: false,
@@ -3811,6 +4389,7 @@ export default function App() {
 		open: false,
 		edit: null,
 	});
+	const [isDataMgmtOpen, setDataMgmtOpen] = useState(false);
 
 	const [theme, setTheme] = useStickyState("system", "fintrack-theme");
 	const [currency, setCurrency] = useStickyState("USD", "fintrack-currency");
@@ -3831,33 +4410,23 @@ export default function App() {
 
 	useEffect(() => {
 		const root = document.documentElement;
-
 		if (theme === "light") {
 			root.classList.remove("dark");
-			return;
-		}
-		if (theme === "dark") {
+		} else if (theme === "dark") {
 			root.classList.add("dark");
-			return;
+		} else {
+			const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+			const handleSystemThemeChange = (e) => {
+				root.classList.toggle("dark", e.matches);
+			};
+			handleSystemThemeChange(mediaQuery);
+			mediaQuery.addEventListener("change", handleSystemThemeChange);
+			return () =>
+				mediaQuery.removeEventListener("change", handleSystemThemeChange);
 		}
-
-		// If theme is 'system'
-		const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-		const handleSystemThemeChange = (e) => {
-			root.classList.toggle("dark", e.matches);
-		};
-
-		handleSystemThemeChange(mediaQuery);
-		mediaQuery.addEventListener("change", handleSystemThemeChange);
-
-		return () => {
-			mediaQuery.removeEventListener("change", handleSystemThemeChange);
-		};
 	}, [theme]);
 
-	// Add PWA manifest and iOS tags
 	useEffect(() => {
-		// Add viewport meta tag for safe areas
 		let viewport = document.querySelector('meta[name="viewport"]');
 		if (!viewport) {
 			viewport = document.createElement("meta");
@@ -3866,73 +4435,6 @@ export default function App() {
 		}
 		viewport.content =
 			"width=device-width, initial-scale=1.0, viewport-fit=cover";
-
-		const manifest = {
-			name: "FinTrack - Personal Finance Tracker",
-			short_name: "FinTrack",
-			start_url: ".",
-			display: "standalone",
-			background_color: "#111827", // Dark gray background
-			theme_color: "#4f46e5", // Indigo theme color
-			description: "A modern, offline-first personal finance tracker.",
-			icons: [
-				{
-					src: "https://placehold.co/192x192/4f46e5/ffffff?text=FT",
-					type: "image/png",
-					sizes: "192x192",
-					purpose: "any",
-				},
-				{
-					src: "https://placehold.co/512x512/4f46e5/ffffff?text=FT",
-					type: "image/png",
-					sizes: "512x512",
-					purpose: "any",
-				},
-				{
-					src: "https://placehold.co/192x192/4f46e5/ffffff?text=FT",
-					type: "image/png",
-					sizes: "192x192",
-					purpose: "maskable",
-				},
-				{
-					src: "https://placehold.co/512x512/4f46e5/ffffff?text=FT",
-					type: "image/png",
-					sizes: "512x512",
-					purpose: "maskable",
-				},
-			],
-		};
-		const manifestString = JSON.stringify(manifest);
-		const blob = new Blob([manifestString], { type: "application/json" });
-		const manifestURL = URL.createObjectURL(blob);
-
-		document.querySelector('link[rel="manifest"]')?.remove();
-		const manifestLink = document.createElement("link");
-		manifestLink.rel = "manifest";
-		manifestLink.href = manifestURL;
-		document.head.appendChild(manifestLink);
-
-		document
-			.querySelector('meta[name="apple-mobile-web-app-capable"]')
-			?.remove();
-		const appleCapable = document.createElement("meta");
-		appleCapable.name = "apple-mobile-web-app-capable";
-		appleCapable.content = "yes";
-		document.head.appendChild(appleCapable);
-
-		document
-			.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
-			?.remove();
-		const appleStatus = document.createElement("meta");
-		appleStatus.name = "apple-mobile-web-app-status-bar-style";
-		appleStatus.content = "black-translucent";
-		document.head.appendChild(appleStatus);
-
-		document.querySelector('link[rel="apple-touch-icon"]')?.remove();
-		const appleIcon = document.createElement("link");
-		appleIcon.rel = "apple-touch-icon";
-		appleIcon.href = "https://placehold.co/180x180/4f46e5/ffffff?text=FT";
-		document.head.appendChild(appleIcon);
 	}, []);
 
 	const handleError = (message) => {
@@ -3973,30 +4475,49 @@ export default function App() {
 		});
 	};
 
-	const navigate = (view) => {
+	const navigate = (view, accountId = null) => {
+		if (view === "accountDetail" && accountId) {
+			setViewingAccountId(accountId);
+		}
 		setViewHistory((prev) => [...prev, view]);
 		setActiveView(view);
 	};
+
 	const handleBack = () => {
 		const newHistory = [...viewHistory];
-		newHistory.pop();
+		const currentView = newHistory.pop();
+		if (currentView === "accountDetail") {
+			setViewingAccountId(null);
+		}
 		setActiveView(newHistory[newHistory.length - 1] || "dashboard");
 		setViewHistory(newHistory);
 	};
+
 	const navigateToTab = (view) => {
 		setActiveView(view);
 		setViewHistory([view]);
 	};
 
-	const openTxModal = (editTx = null) =>
-		setTxModalState({ open: true, edit: editTx, delete: null });
+	const openTxModal = (editTx = null) => {
+		const isCorrection =
+			editTx &&
+			(editTx.category === "Balance Correction" ||
+				editTx.category === "Balance Adjustment");
+		setTxModalState({ open: true, edit: editTx, delete: null, isCorrection });
+	};
 	const closeTxModal = () =>
-		setTxModalState({ open: false, edit: null, delete: null });
+		setTxModalState({
+			open: false,
+			edit: null,
+			delete: null,
+			isCorrection: false,
+		});
 	const txModalControls = {
 		open: openTxModal,
 		close: closeTxModal,
 		edit: (tx) => openTxModal(tx),
-		delete: (txId) => setTxModalState({ ...txModalState, delete: txId }),
+		delete: (txId) =>
+			setTxModalState((prev) => ({ ...prev, open: true, delete: txId })),
 	};
 	const openBudgetModal = (editBudget = null) =>
 		setBudgetModalState({ open: true, edit: editBudget, delete: null });
@@ -4007,7 +4528,8 @@ export default function App() {
 		close: closeBudgetModal,
 		edit: openBudgetModal,
 		delete: (budgetId) =>
-			setBudgetModalState({ ...budgetModalState, delete: budgetId }),
+			setBudgetModalState((prev) => ({ ...prev, delete: budgetId })),
+		duplicate: finTrackData.handleDuplicateBudget,
 	};
 	const openAccountModal = (editAccount = null) =>
 		setAccountModalState({ open: true, edit: editAccount });
@@ -4064,7 +4586,19 @@ export default function App() {
 		manageAccounts: "Manage Accounts",
 		manageCategories: "Manage Categories",
 		manageRecurring: "Recurring Transactions",
+		accountDetail: "Account Details",
 	};
+
+	const getPageTitle = () => {
+		if (activeView === "accountDetail" && viewingAccountId) {
+			const account = finTrackData.accounts.find(
+				(a) => a.id === viewingAccountId,
+			);
+			return account ? account.name : "Account Details";
+		}
+		return pageTitles[activeView] || "FinTrack";
+	};
+
 	const renderActiveView = () => {
 		if (finTrackData.isDbLoading)
 			return <div className="p-8 text-center">Loading Database...</div>;
@@ -4098,13 +4632,26 @@ export default function App() {
 			case "accounts":
 				return <AccountsPage {...props} />;
 			case "settings":
-				return <SettingsPage {...props} />;
+				return (
+					<SettingsPage
+						onDataManagementClick={() => setDataMgmtOpen(true)}
+						{...props}
+					/>
+				);
 			case "manageAccounts":
 				return <ManageAccountsPage {...props} />;
 			case "manageCategories":
 				return <ManageCategoriesPage {...props} />;
 			case "manageRecurring":
 				return <ManageRecurringPage {...props} />;
+			case "accountDetail": {
+				const account = finTrackData.accounts.find(
+					(a) => a.id === viewingAccountId,
+				);
+				if (!account)
+					return <div className="p-8 text-center">Account not found.</div>;
+				return <AccountDetailPage account={account} {...props} />;
+			}
 			default:
 				return <DashboardPage {...props} />;
 		}
@@ -4112,25 +4659,24 @@ export default function App() {
 
 	return (
 		<div className="bg-gray-50 dark:bg-gray-900 min-h-screen font-sans text-gray-900 dark:text-gray-100">
-			{" "}
-			<ErrorBannerSystem errors={errors} onClose={closeError} />{" "}
+			<ErrorBannerSystem errors={errors} onClose={closeError} />
 			<div className="relative flex">
-				{" "}
-				<Sidebar activeView={activeView} onTabClick={navigateToTab} />{" "}
+				<Sidebar activeView={activeView} onTabClick={navigateToTab} />
 				<div className="flex-1 flex flex-col w-full md:ml-64">
-					{" "}
 					<Header
 						onSettingsClick={() => navigate("settings")}
 						notifications={finTrackData.notifications}
 						onClearNotifications={() => finTrackData.setNotifications([])}
-						pageTitle={pageTitles[activeView] || "FinTrack"}
+						pageTitle={getPageTitle()}
 						onBack={viewHistory.length > 1 ? handleBack : null}
-					/>{" "}
-					<main className="pb-28 md:pb-6">{renderActiveView()}</main>{" "}
-				</div>{" "}
-			</div>{" "}
-			<BottomNav activeView={activeView} onTabClick={navigateToTab} />{" "}
-			{(activeView === "dashboard" || activeView === "transactions") && (
+					/>
+					<main className="pb-28 md:pb-6">{renderActiveView()}</main>
+				</div>
+			</div>
+			<BottomNav activeView={activeView} onTabClick={navigateToTab} />
+			{(activeView === "dashboard" ||
+				activeView === "transactions" ||
+				activeView === "accountDetail") && (
 				<button
 					type="button"
 					onClick={() => openTxModal()}
@@ -4138,25 +4684,27 @@ export default function App() {
 				>
 					<Plus size={24} />
 				</button>
-			)}{" "}
+			)}
 			<TransactionModal
-				isOpen={txModalState.open}
+				isOpen={txModalState.open && !txModalState.delete}
 				onClose={closeTxModal}
 				onSave={finTrackData.handleSaveTransaction}
 				transactionToEdit={txModalState.edit}
 				accounts={finTrackData.accounts}
 				categories={finTrackData.categories}
 				onError={handleError}
-			/>{" "}
+				isCorrectionMode={txModalState.isCorrection}
+			/>
 			<ConfirmationModal
 				isOpen={!!txModalState.delete}
 				onClose={closeTxModal}
-				onConfirm={() =>
-					finTrackData.handleDeleteTransaction(txModalState.delete)
-				}
+				onConfirm={() => {
+					finTrackData.handleDeleteTransaction(txModalState.delete);
+					closeTxModal();
+				}}
 				title="Delete Transaction"
 				message="Are you sure you want to delete this transaction?"
-			/>{" "}
+			/>
 			<BudgetModal
 				isOpen={budgetModalState.open}
 				onClose={closeBudgetModal}
@@ -4164,32 +4712,26 @@ export default function App() {
 				budgetToEdit={budgetModalState.edit}
 				masterCategories={finTrackData.categories}
 				onError={handleError}
-			/>{" "}
+			/>
 			<ConfirmationModal
 				isOpen={!!budgetModalState.delete}
 				onClose={closeBudgetModal}
-				onConfirm={() =>
-					finTrackData.handleDeleteBudget(budgetModalState.delete)
-				}
+				onConfirm={() => {
+					finTrackData.handleDeleteBudget(budgetModalState.delete);
+					closeBudgetModal();
+				}}
 				title="Delete Budget"
 				message="Are you sure you want to delete this budget?"
-			/>{" "}
+			/>
 			<AccountModal
 				isOpen={accountModalState.open}
 				onClose={closeAccountModal}
 				onSave={finTrackData.handleSaveAccount}
 				onDelete={finTrackData.handleDeleteAccount}
 				accountToEdit={accountModalState.edit}
-				calculatedBalance={
-					accountModalState.edit
-						? finTrackData.calculatedData.accountBalances[
-								accountModalState.edit.id
-							]
-						: 0
-				}
 				onSaveTransaction={finTrackData.handleSaveTransaction}
 				onError={handleError}
-			/>{" "}
+			/>
 			<CategoryModal
 				isOpen={categoryModalState.open}
 				onClose={closeCategoryModal}
@@ -4199,7 +4741,7 @@ export default function App() {
 				categoryType={categoryModalState.type}
 				onError={handleError}
 				categories={finTrackData.categories}
-			/>{" "}
+			/>
 			<RecurringTransactionModal
 				isOpen={recurringModalState.open}
 				onClose={closeRecurringModal}
@@ -4208,7 +4750,13 @@ export default function App() {
 				accounts={finTrackData.accounts}
 				categories={finTrackData.categories}
 				onError={handleError}
-			/>{" "}
+			/>
+			<DataManagementModal
+				isOpen={isDataMgmtOpen}
+				onClose={() => setDataMgmtOpen(false)}
+				finTrackData={finTrackData}
+				onError={handleError}
+			/>
 		</div>
 	);
 }
