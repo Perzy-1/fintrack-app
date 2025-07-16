@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 // import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@7/build/index.js'; // Removed static import
-import appIconUrl from "./assets/svgviewer-output.svg"; // Adjust path if needed
 import {
 	Home,
 	BarChart2,
@@ -849,7 +848,7 @@ const Header = ({
 	const [panelOpen, setPanelOpen] = useState(false);
 	const unreadCount = notifications.filter((n) => !n.read).length;
 	return (
-		<header className="flex justify-between items-center p-4 bg-white dark:bg-gray-800 border-b dark:border-gray-700 sticky top-0 z-20">
+		<header className="flex justify-between items-center px-4 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] bg-white dark:bg-gray-800 border-b dark:border-gray-700 sticky top-0 z-20">
 			{" "}
 			<div className="flex items-center">
 				{" "}
@@ -991,7 +990,7 @@ const BottomNav = ({ activeView, onTabClick }) => {
 		{ name: "Accounts", icon: Wallet, view: "accounts" },
 	];
 	return (
-		<div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t dark:border-gray-700 flex justify-around p-2 z-20 md:hidden">
+		<div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t dark:border-gray-700 flex justify-around px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] z-20 md:hidden">
 			{" "}
 			{navItems.map((item) => (
 				<button
@@ -3001,6 +3000,9 @@ const SettingsPage = ({
 				</div>{" "}
 			</Card>{" "}
 			<DataManagement finTrackData={finTrackData} onError={() => {}} />{" "}
+			<div className="text-center text-xs text-gray-400 dark:text-gray-500 mt-4">
+				Version: {import.meta.env.VITE_APP_VERSION}
+			</div>
 		</div>
 	);
 };
@@ -3855,15 +3857,50 @@ export default function App() {
 
 	// Add PWA manifest and iOS tags
 	useEffect(() => {
+		// Add viewport meta tag for safe areas
+		let viewport = document.querySelector('meta[name="viewport"]');
+		if (!viewport) {
+			viewport = document.createElement("meta");
+			viewport.name = "viewport";
+			document.head.appendChild(viewport);
+		}
+		viewport.content =
+			"width=device-width, initial-scale=1.0, viewport-fit=cover";
+
 		const manifest = {
 			name: "FinTrack - Personal Finance Tracker",
 			short_name: "FinTrack",
 			start_url: ".",
 			display: "standalone",
-			background_color: "#111827",
-			theme_color: "#4f46e5",
+			background_color: "#111827", // Dark gray background
+			theme_color: "#4f46e5", // Indigo theme color
 			description: "A modern, offline-first personal finance tracker.",
-			icons: [{ src: appIconUrl, type: "image/svg+xml", sizes: "any" }],
+			icons: [
+				{
+					src: "https://placehold.co/192x192/4f46e5/ffffff?text=FT",
+					type: "image/png",
+					sizes: "192x192",
+					purpose: "any",
+				},
+				{
+					src: "https://placehold.co/512x512/4f46e5/ffffff?text=FT",
+					type: "image/png",
+					sizes: "512x512",
+					purpose: "any",
+				},
+				{
+					src: "https://placehold.co/192x192/4f46e5/ffffff?text=FT",
+					type: "image/png",
+					sizes: "192x192",
+					purpose: "maskable",
+				},
+				{
+					src: "https://placehold.co/512x512/4f46e5/ffffff?text=FT",
+					type: "image/png",
+					sizes: "512x512",
+					purpose: "maskable",
+				},
+			],
 		};
 		const manifestString = JSON.stringify(manifest);
 		const blob = new Blob([manifestString], { type: "application/json" });
@@ -3891,11 +3928,10 @@ export default function App() {
 		appleStatus.content = "black-translucent";
 		document.head.appendChild(appleStatus);
 
-		// Update the Apple Touch Icon
 		document.querySelector('link[rel="apple-touch-icon"]')?.remove();
 		const appleIcon = document.createElement("link");
 		appleIcon.rel = "apple-touch-icon";
-		appleIcon.href = appIconUrl; // Use the imported SVG
+		appleIcon.href = "https://placehold.co/180x180/4f46e5/ffffff?text=FT";
 		document.head.appendChild(appleIcon);
 	}, []);
 
@@ -4090,7 +4126,7 @@ export default function App() {
 						pageTitle={pageTitles[activeView] || "FinTrack"}
 						onBack={viewHistory.length > 1 ? handleBack : null}
 					/>{" "}
-					<main className="pb-20 md:pb-6">{renderActiveView()}</main>{" "}
+					<main className="pb-28 md:pb-6">{renderActiveView()}</main>{" "}
 				</div>{" "}
 			</div>{" "}
 			<BottomNav activeView={activeView} onTabClick={navigateToTab} />{" "}
