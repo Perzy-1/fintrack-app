@@ -1,20 +1,25 @@
 {
-	"short_name": "FinTrack",
-	"name": "FinTrack - Finance Tracker",
-	"icons": [
-		{
-			"src": "icon-192x192.png",
-			"type": "image/png",
-			"sizes": "192x192"
-		},
-		{
-			"src": "icon-512x512.png",
-			"type": "image/png",
-			"sizes": "512x512"
-		}
-	],
-	"start_url": ".",
-	"display": "standalone",
-	"theme_color": "#1f2937",
-	"background_color": "#ffffff"
+  "short_name": "FinTrack",
+  "name": "FinTrack - Personal Finance Tracker",
+  "icons": [
+    {
+      "src": "vite.svg",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "vite.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192"
+    },
+    {
+      "src": "vite.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#4f46e5",
+  "background_color": "#f9fafb"
 }

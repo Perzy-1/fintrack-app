@@ -1,7 +1,7 @@
 {
   "name": "fintrack-app",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "homepage": "https://Perzy-1.github.io/fintrack-app",
   "scripts": {
