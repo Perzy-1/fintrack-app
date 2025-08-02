@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Bell, Settings, ChevronLeft, AlertTriangle, CheckCircle } from 'lucide-react';
 
-const Header = ({ onSettingsClick, notifications, onClearNotifications, pageTitle, onBack }) => {
+const Header = ({ onSettingsClick, notifications = [], onClearNotifications, pageTitle, onBack }) => {
 	const [panelOpen, setPanelOpen] = useState(false);
 	const unreadCount = notifications.filter((n) => !n.read).length;
 	return (

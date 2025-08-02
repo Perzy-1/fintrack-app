@@ -1,8 +1,9 @@
 #!/bin/bash
 
 # --- Automated Fix Script for FinTrack App ---
-# This script corrects the loan balance calculation and payment schedule
-# generation in the LoanDetailPage component.
+# This script reverts the database import statement in the useFinTrack hook
+# to the correct named import syntax. This is the opposite of the previous
+# incorrect fix.
 
 # --- Helper Functions ---
 function create_file {
@@ -13,117 +14,109 @@ function create_file {
 }
 
 # --- Main Execution ---
-echo "Starting the fix process for the Loan Detail Page..."
+echo "Reverting to the correct database import..."
 
-# 1. Update src/pages/LoanDetailPage.jsx with corrected logic
-echo "Fixing src/pages/LoanDetailPage.jsx..."
-create_file src/pages/LoanDetailPage.jsx <<'EOF'
-import React, { useMemo } from 'react';
-import Card from '../components/common/Card';
-import TransactionList from '../components/transactions/TransactionList';
-import { formatCurrency, formatDateForInput } from '../lib/utils';
-import { AlertTriangle } from 'lucide-react';
+# 1. Update src/hooks/useFinTrack.js to use the correct named import syntax.
+echo "Fixing the import statement in src/hooks/useFinTrack.js..."
+create_file src/hooks/useFinTrack.js <<'EOF'
+import { useState, useCallback } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+// Reverted to the correct named import.
+import { db } from '../lib/db';
+import { useStickyState } from './useStickyState';
+import { addMonths, startOfMonth, endOfMonth, differenceInCalendarMonths } from 'date-fns';
 
-const LoanDetailPage = ({ account, finTrackData, txModalControls }) => {
-	const { transactions, accounts, categories, currency } = finTrackData;
+export function useFinTrack() {
+  const [currency, setCurrency] = useStickyState('USD', 'fintrack-currency');
 
-	const {
-		relatedTransactions,
-		totalPaid,
-		paymentSchedule,
-		interestPerMonth,
-		totalInterest,
-	} = useMemo(() => {
-		const related = transactions.filter(
-			(tx) =>
-				tx.type === "income" &&
-				tx.category === "Loan Collection" &&
-				tx.accountId === account.id,
-		);
+  const finTrackData = useLiveQuery(async () => {
+    const accounts = await db.accounts.toArray();
+    const transactions = await db.transactions.toArray();
+    const categories = await db.categories.toArray();
+    const budgets = await db.budgets.toArray();
+    const recurring = await db.recurring.toArray();
 
-		const totalPaid = related.reduce((sum, tx) => sum + tx.amount, 0);
+    return {
+      accounts,
+      transactions,
+      categories,
+      budgets,
+      recurring,
+    };
+  }, []);
 
-		const schedule = [];
-		const interestRate = parseFloat(account.interestRate) || 0;
-		const principal = account.balance;
-		
-		const monthlyInterest = (principal * interestRate) / 100;
-		let totalInterestPayable = 0;
+  const isLoading = finTrackData === undefined;
 
-		if (account.interestCollectionFrequency === "Monthly" && account.dueDate) {
-			let startDate = new Date(account.id.split("-")[1]);
-			let currentDate = new Date(startDate);
-			const finalDueDate = new Date(account.dueDate);
+  const {
+    accounts = [],
+    transactions = [],
+    categories = [],
+    budgets = [],
+    recurring = [],
+  } = finTrackData || {};
 
-			while (currentDate < finalDueDate) {
-				currentDate.setMonth(currentDate.getMonth() + 1);
-				if (currentDate <= finalDueDate) {
-					schedule.push({
-						date: formatDateForInput(new Date(currentDate)),
-						amount: monthlyInterest,
-					});
-				}
-			}
-			totalInterestPayable = monthlyInterest * schedule.length;
-		}
+  const [error, setError] = useState(null);
+  const [errorCount, setErrorCount] = useState(0);
 
-		return {
-			relatedTransactions: related,
-			totalPaid,
-			paymentSchedule: schedule,
-			interestPerMonth: monthlyInterest,
-			totalInterest: totalInterestPayable,
-		};
-	}, [account, transactions]);
+  const addError = useCallback((message) => {
+    const newError = { id: Date.now(), message };
+    setError(newError);
+    setErrorCount((prev) => prev + 1);
+  }, []);
 
-	const remainingBalance = (account.balance + totalInterest) - totalPaid;
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
 
-	return (
-		<div className="p-4 md:p-6 space-y-6">
-			<Card>
-				<h3 className="text-lg font-semibold mb-4">Loan Summary</h3>
-				<div className="grid grid-cols-2 gap-4 text-sm">
-					<div className="font-semibold text-gray-500">Principal Lent:</div><div>{formatCurrency(account.balance, currency)}</div>
-					<div className="font-semibold text-gray-500">Interest Rate:</div><div>{account.interestRate || "0"}%</div>
-					<div className="font-semibold text-gray-500">Interest Per Month:</div><div>{formatCurrency(interestPerMonth, currency)}</div>
-					<div className="font-semibold text-gray-500">Total Interest Payable:</div><div>{formatCurrency(totalInterest, currency)}</div>
-					<div className="font-semibold text-gray-500">Total Paid Back:</div><div className="text-green-500">{formatCurrency(totalPaid, currency)}</div>
-					<div className="font-semibold text-gray-500">Remaining Balance:</div><div className="font-bold">{formatCurrency(remainingBalance, currency)}</div>
-					<div className="font-semibold text-gray-500">Collection Schedule:</div><div>{account.interestCollectionFrequency}</div>
-					<div className="font-semibold text-gray-500">Final Due Date:</div><div>{account.dueDate}</div>
-				</div>
-			</Card>
+  const [isTxModalOpen, setTxModalOpen] = useState(false);
+  const [isRecurringModalOpen, setRecurringModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState(null);
+  const [editingRecurring, setEditingRecurring] = useState(null);
 
-			<Card>
-				<h3 className="text-lg font-semibold mb-4">Payment Schedule</h3>
-				{paymentSchedule.length > 0 ? (
-					<div className="space-y-2 max-h-60 overflow-y-auto">
-						{paymentSchedule.map((payment, index) => (
-							<div key={index} className="flex justify-between items-center text-sm p-2 rounded-md bg-gray-50 dark:bg-gray-700/50">
-								<span>{payment.date}</span>
-								<span className="font-semibold">{formatCurrency(payment.amount, currency)}</span>
-							</div>
-						))}
-					</div>
-				) : (
-					<p className="text-sm text-gray-500">No payment schedule available for this loan type.</p>
-				)}
-				{account.overdueAmount > 0 && (
-					<div className="font-semibold text-yellow-500 text-center pt-2 border-t mt-2">
-						<AlertTriangle className="inline-block mr-2" size={16} />
-						Overdue Amount: {formatCurrency(account.overdueAmount, currency)}
-					</div>
-				)}
-			</Card>
+  const txModalControls = {
+    open: (tx = null) => {
+      setEditingTransaction(tx);
+      setTxModalOpen(true);
+    },
+    close: () => {
+      setEditingTransaction(null);
+      setTxModalOpen(false);
+    },
+    isOpen: isTxModalOpen,
+    editingTransaction,
+  };
 
-			<TransactionList title="Payment History" transactions={relatedTransactions} txModalControls={txModalControls} accounts={accounts} categories={categories} currency={currency} />
-		</div>
-	);
-};
+  const recurringModalControls = {
+    open: (tx = null) => {
+      setEditingRecurring(tx);
+      setRecurringModalOpen(true);
+    },
+    close: () => {
+      setEditingRecurring(null);
+      setRecurringModalOpen(false);
+    },
+    isOpen: isRecurringModalOpen,
+    editingRecurring,
+  };
 
-export default LoanDetailPage;
+  return {
+    isLoading,
+    accounts,
+    transactions,
+    categories,
+    budgets,
+    recurring,
+    currency,
+    setCurrency,
+    error,
+    errorCount,
+    addError,
+    clearError,
+    txModalControls,
+    recurringModalControls
+  };
+}
 EOF
 
-echo "Fix script complete!"
-echo "The Loan Detail Page has been fixed with accurate calculations and a full payment schedule."
-echo "Please restart your development server to see the changes."
+echo "The import statement has been corrected."
+echo "Please restart the development server. We should be in the clear now."
