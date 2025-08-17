@@ -4,11 +4,12 @@ import Card from '../common/Card';
 import CalculatorInput from '../common/CalculatorInput';
 import { formatDateForInput } from '../../lib/utils';
 
-const TransactionModal = ({ isOpen, onClose, onSave, transactionToEdit, accounts, categories, onError, isCorrectionMode }) => {
-	const [type, setType] = useState("expense");
-	const [accountId, setAccountId] = useState(accounts[0]?.id || "");
-	const [amount, setAmount] = useState("");
-	const [category, setCategory] = useState(Object.keys(categories.expense)[0] || "");
+const TransactionModal = ({ isOpen, onClose, onSave, transactionToEdit, accounts, categories = { income: {}, expense: {} }, onError, isCorrectionMode }) => {
+        const safeCategories = useMemo(() => ({ income: categories.income || {}, expense: categories.expense || {} }), [categories]);
+        const [type, setType] = useState("expense");
+        const [accountId, setAccountId] = useState(accounts[0]?.id || "");
+        const [amount, setAmount] = useState("");
+        const [category, setCategory] = useState(Object.keys(safeCategories.expense)[0] || "");
 	const [date, setDate] = useState(formatDateForInput(new Date()));
 	const [description, setDescription] = useState("");
 	const [fromAccount, setFromAccount] = useState(accounts[0]?.id || "");
@@ -26,8 +27,8 @@ const TransactionModal = ({ isOpen, onClose, onSave, transactionToEdit, accounts
 	const transferAccounts = useMemo(() => accounts.filter((acc) => acc.type !== "Loan" && acc.type !== "Liability"), [accounts]);
 
 	useEffect(() => {
-		if (isOpen) {
-			const defaults = { type: "expense", accountId: availableAccounts[0]?.id || "", amount: "", category: Object.keys(categories.expense)[0] || "", date: formatDateForInput(new Date()), description: "", fromAccount: transferAccounts[0]?.id || "", toAccount: transferAccounts[1]?.id || "", fee: "", interestAmount: "" };
+                if (isOpen) {
+                        const defaults = { type: "expense", accountId: availableAccounts[0]?.id || "", amount: "", category: Object.keys(safeCategories.expense)[0] || "", date: formatDateForInput(new Date()), description: "", fromAccount: transferAccounts[0]?.id || "", toAccount: transferAccounts[1]?.id || "", fee: "", interestAmount: "" };
 			const initial = isEditMode ? { ...defaults, ...transactionToEdit, amount: transactionToEdit.amount.toString(), fee: transactionToEdit.fee?.toString() || "", interestAmount: transactionToEdit.interestAmount?.toString() || "" } : defaults;
 			setType(initial.type);
 			setAccountId(initial.accountId);
@@ -42,11 +43,11 @@ const TransactionModal = ({ isOpen, onClose, onSave, transactionToEdit, accounts
 		}
 	}, [isOpen, isEditMode, transactionToEdit, accounts, categories, availableAccounts, transferAccounts]);
 
-	useEffect(() => {
-		if (isCorrectionMode) return;
-		if (type === "income") setCategory(Object.keys(categories.income)[0] || "");
-		else setCategory(Object.keys(categories.expense)[0] || "");
-	}, [type, categories, isCorrectionMode]);
+        useEffect(() => {
+                if (isCorrectionMode) return;
+                if (type === "income") setCategory(Object.keys((categories && categories.income) || {})[0] || "");
+                else setCategory(Object.keys((categories && categories.expense) || {})[0] || "");
+        }, [type, categories, isCorrectionMode]);
 
 	useEffect(() => {
 		if (!availableAccounts.find((a) => a.id === accountId)) setAccountId(availableAccounts[0]?.id || "");
@@ -72,7 +73,7 @@ const TransactionModal = ({ isOpen, onClose, onSave, transactionToEdit, accounts
 	};
 
 	if (!isOpen) return null;
-	const categoryOptions = type === "income" ? categories.income : categories.expense;
+        const categoryOptions = type === "income" ? safeCategories.income : safeCategories.expense;
 	const typeOptions = [{ label: "Income", value: "income" }, { label: "Expense", value: "expense" }, { label: "Transfer", value: "transfer" }];
 
 	return (

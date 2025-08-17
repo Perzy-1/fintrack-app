@@ -8,5 +8,8 @@ export default defineConfig({
   base: '/fintrack-app/',
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(version)
+  },
+  test: {
+    environment: 'jsdom'
   }
 })

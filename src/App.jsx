@@ -71,7 +71,7 @@ function App() {
   });
 
   return (
-    <Router>
+    <Router basename={import.meta.env.BASE_URL}>
       <div className="flex h-screen bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
         {!isMobile && <Sidebar />}
         <div className="flex flex-1 flex-col">
