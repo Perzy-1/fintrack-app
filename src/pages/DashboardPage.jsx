@@ -7,8 +7,15 @@ import TransactionList from '../components/transactions/TransactionList';
 import { formatCurrency, getStartOfMonth, getEndOfMonth, getStartOfYear, getEndOfYear, formatRangeLabel } from '../lib/utils';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-const DashboardPage = ({ finTrackData, txModalControls }) => {
-	const { transactions, budgets, calculatedData, categories, accounts, currency } = finTrackData;
+const DashboardPage = ({ finTrackData = {}, txModalControls }) => {
+        const {
+                transactions = [],
+                budgets = [],
+                calculatedData = {},
+                categories = {},
+                accounts = [],
+                currency = 'USD',
+        } = finTrackData;
 	const [filterPeriod, setFilterPeriod] = useState("monthly");
 	const [referenceDate, setReferenceDate] = useState(new Date());
 
