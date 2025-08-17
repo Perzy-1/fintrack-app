@@ -1,14 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X } from 'lucide-react';
 import Card from '../common/Card';
 import CalculatorInput from '../common/CalculatorInput';
 import { formatDateForInput } from '../../lib/utils';
 
-const RecurringTransactionModal = ({ isOpen, onClose, onSave, transactionToEdit, accounts, categories, onError }) => {
-	const [type, setType] = useState("expense");
-	const [accountId, setAccountId] = useState(accounts[0]?.id || "");
-	const [amount, setAmount] = useState("");
-	const [category, setCategory] = useState(Object.keys(categories.expense)[0] || "");
+const RecurringTransactionModal = ({
+        isOpen,
+        onClose,
+        onSave,
+        transactionToEdit,
+        accounts = [],
+        categories,
+        onError,
+}) => {
+        const safeAccounts = useMemo(() => accounts ?? [], [accounts]);
+        const safeCategories = useMemo(
+                () => categories ?? { income: {}, expense: {} },
+                [categories],
+        );
+        const [type, setType] = useState("expense");
+        const [accountId, setAccountId] = useState(safeAccounts[0]?.id || "");
+        const [amount, setAmount] = useState("");
+        const [category, setCategory] = useState(Object.keys(safeCategories.expense || {})[0] || "");
 	const [description, setDescription] = useState("");
 	const [frequency, setFrequency] = useState("Monthly");
 	const [startDate, setStartDate] = useState(formatDateForInput(new Date()));
@@ -16,8 +29,17 @@ const RecurringTransactionModal = ({ isOpen, onClose, onSave, transactionToEdit,
 
 	useEffect(() => {
 		if (isOpen) {
-			const defaults = { type: "expense", accountId: accounts[0]?.id || "", amount: "", category: Object.keys(categories.expense)[0] || "", description: "", frequency: "Monthly", startDate: formatDateForInput(new Date()), lastProcessed: null };
-			const initial = isEditMode ? { ...defaults, ...transactionToEdit, amount: transactionToEdit.amount.toString() } : defaults;
+                        const defaults = {
+                                type: "expense",
+                                accountId: safeAccounts[0]?.id || "",
+                                amount: "",
+                                category: Object.keys(safeCategories.expense || {})[0] || "",
+                                description: "",
+                                frequency: "Monthly",
+                                startDate: formatDateForInput(new Date()),
+                                lastProcessed: null,
+                        };
+        const initial = isEditMode ? { ...defaults, ...transactionToEdit, amount: transactionToEdit.amount.toString() } : defaults;
 			setType(initial.type);
 			setAccountId(initial.accountId);
 			setAmount(initial.amount);
@@ -26,7 +48,7 @@ const RecurringTransactionModal = ({ isOpen, onClose, onSave, transactionToEdit,
 			setFrequency(initial.frequency);
 			setStartDate(initial.startDate);
 		}
-	}, [isOpen, isEditMode, transactionToEdit, accounts, categories]);
+        }, [isOpen, isEditMode, transactionToEdit, safeAccounts, safeCategories]);
 
 	const handleSubmit = (e) => {
 		e.preventDefault();
@@ -38,7 +60,7 @@ const RecurringTransactionModal = ({ isOpen, onClose, onSave, transactionToEdit,
 	};
 
 	if (!isOpen) return null;
-	const categoryOptions = type === "income" ? categories.income : categories.expense;
+        const categoryOptions = type === "income" ? safeCategories.income || {} : safeCategories.expense || {};
 
 	return (
 		<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -71,9 +93,9 @@ const RecurringTransactionModal = ({ isOpen, onClose, onSave, transactionToEdit,
 					</div>
 					<div className="flex items-center gap-4">
 						<label htmlFor="rec-account" className="w-24">Account</label>
-						<select id="rec-account" value={accountId} onChange={(e) => setAccountId(e.target.value)} className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600">
-							{accounts.map((a) => (<option key={a.id} value={a.id}>{a.name}</option>))}
-						</select>
+                                                <select id="rec-account" value={accountId} onChange={(e) => setAccountId(e.target.value)} className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600">
+                                                        {safeAccounts.map((a) => (<option key={a.id} value={a.id}>{a.name}</option>))}
+                                                </select>
 					</div>
 					<div className="flex items-center gap-4">
 						<label htmlFor="rec-frequency" className="w-24">Frequency</label>
