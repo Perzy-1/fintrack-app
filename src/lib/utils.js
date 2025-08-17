@@ -70,11 +70,14 @@ export const formatRangeLabel = (period, date) => {
 };
 
 export const formatCurrency = (amount, currencyKey = "USD") => {
-	const symbol = currencyMap[currencyKey] || "$";
-	return `${symbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const symbol = currencyMap[currencyKey] || "$";
+        const numericAmount = typeof amount === "number" ? amount : Number(amount) || 0;
+        return `${symbol}${numericAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 export const formatDateHeader = (dateString) => {
-	const date = new Date(dateString + "T00:00:00");
-	return date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+        if (!dateString) return "";
+        const date = new Date(dateString + "T00:00:00");
+        if (isNaN(date)) return "";
+        return date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 };
