@@ -41,7 +41,7 @@ const TransactionModal = ({ isOpen, onClose, onSave, transactionToEdit, accounts
 			setFee(initial.fee);
             setInterestAmount(initial.interestAmount);
 		}
-	}, [isOpen, isEditMode, transactionToEdit, accounts, categories, availableAccounts, transferAccounts]);
+        }, [isOpen, isEditMode, transactionToEdit, accounts, categories, availableAccounts, transferAccounts, safeCategories]);
 
         useEffect(() => {
                 if (isCorrectionMode) return;

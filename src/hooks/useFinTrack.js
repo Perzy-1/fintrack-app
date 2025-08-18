@@ -3,7 +3,6 @@ import { useLiveQuery } from 'dexie-react-hooks';
 // Reverted to the correct named import.
 import { db, initDB } from '../lib/db';
 import { useStickyState } from './useStickyState';
-import { addMonths, startOfMonth, endOfMonth, differenceInCalendarMonths } from 'date-fns';
 
 export function useFinTrack() {
   const [currency, setCurrency] = useStickyState('USD', 'fintrack-currency');

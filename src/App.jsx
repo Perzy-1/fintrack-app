@@ -67,6 +67,10 @@ function App() {
     };
   }, [accounts]);
 
+  // Local modal state must be declared before any conditional return so that
+  // the order of hooks remains consistent between renders.
+  const [isDataModalOpen, setDataModalOpen] = useState(false);
+
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -110,8 +114,6 @@ function App() {
     budgetModalControls,
     categoryModalControls,
   };
-
-  const [isDataModalOpen, setDataModalOpen] = useState(false);
 
   const accountRoutes = accounts.map((account) => {
     const PageComponent = account.type === 'loan' ? LoanDetailPage : AccountDetailPage;

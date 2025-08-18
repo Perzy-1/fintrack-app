@@ -73,9 +73,9 @@ const CalculatorInput = ({ value, onChange, placeholder, ...props }) => {
 			if (displayValue) {
 				result = new Function(`return ${displayValue.replace(/×/g, "*").replace(/÷/g, "/")}`)();
 			}
-		} catch (e) {
-			result = parseFloat(displayValue) || 0;
-		}
+                } catch {
+                        result = parseFloat(displayValue) || 0;
+                }
 		onChange({ target: { value: String(result || "") } });
 		setShowKeypad(false);
 		inputRef.current?.blur();

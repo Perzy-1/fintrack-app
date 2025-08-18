@@ -17,27 +17,26 @@ const AccountModal = ({ isOpen, onClose, onSave, onDelete, accountToEdit, onSave
 	const [correctionData, setCorrectionData] = useState(null);
 	const isEditMode = !!accountToEdit;
 
-	useEffect(() => {
-		if (isOpen) {
-			if (isEditMode) {
-				setName(accountToEdit.name);
-				setType(accountToEdit.type);
-				setBalance(accountToEdit.balance.toFixed(2));
-				setInterestRate(accountToEdit.interestRate || "");
-				setDueDate(accountToEdit.dueDate || "");
-				setInterestCollectionFrequency(accountToEdit.interestCollectionFrequency || "Monthly");
-			} else {
-				setName("");
-				setType("Debit Card");
-				setBalance("");
-				setInterestRate("");
-				setDueDate("");
-				setInterestCollectionFrequency("Monthly");
-			}
-			setShowDeleteConfirm(false);
-			setCorrectionData(null);
-		}
-	}, [isOpen, accountToEdit]);
+        useEffect(() => {
+                if (!isOpen) return;
+                if (accountToEdit) {
+                        setName(accountToEdit.name);
+                        setType(accountToEdit.type);
+                        setBalance(accountToEdit.balance.toFixed(2));
+                        setInterestRate(accountToEdit.interestRate || "");
+                        setDueDate(accountToEdit.dueDate || "");
+                        setInterestCollectionFrequency(accountToEdit.interestCollectionFrequency || "Monthly");
+                } else {
+                        setName("");
+                        setType("Debit Card");
+                        setBalance("");
+                        setInterestRate("");
+                        setDueDate("");
+                        setInterestCollectionFrequency("Monthly");
+                }
+                setShowDeleteConfirm(false);
+                setCorrectionData(null);
+        }, [isOpen, accountToEdit]);
 
 	const handleConfirmCorrection = () => {
 		if (!correctionData) return;

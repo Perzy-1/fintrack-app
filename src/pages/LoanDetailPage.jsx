@@ -8,12 +8,9 @@ import { AlertTriangle } from 'lucide-react';
 const LoanDetailPage = ({ accounts, transactions, categories, currency, txModalControls }) => {
     const { id } = useParams();
 
-    // Add a guard clause to handle cases where accounts data is not yet available.
-    if (!accounts || accounts.length === 0) {
-        return <div className="p-4">Loading loan data...</div>;
-    }
-
-    const account = accounts.find((acc) => acc.id === parseInt(id));
+    // Look up the account if accounts data is available. Optional chaining
+    // ensures this doesn't throw before the data is loaded.
+    const account = accounts?.find((acc) => acc.id === parseInt(id));
 
     const {
         relatedTransactions,
@@ -107,6 +104,12 @@ const LoanDetailPage = ({ accounts, transactions, categories, currency, txModalC
             paymentSchedule: schedule,
         };
     }, [account, transactions]);
+
+    // If the accounts data hasn't loaded yet, show a basic loading state
+    // after all hooks have been called to preserve hook order.
+    if (!accounts || accounts.length === 0) {
+        return <div className="p-4">Loading loan data...</div>;
+    }
 
     if (!account) {
         return <div className="p-4">Loan account not found.</div>;
