@@ -78,17 +78,17 @@ const DataManagementModal = ({ isOpen, onClose, finTrackData, onError }) => {
                         const recalculatedAccounts = dataToImport.accounts.map((acc) => ({ ...acc, balance: balances[acc.id] || 0 }));
                         const cleanedData = validateAndCleanData({ ...dataToImport, accounts: recalculatedAccounts });
                         const db = await initDB();
-                        const dbTx = db.transaction(STORES, "readwrite");
-                        await Promise.all([
-                                ...STORES.map((name) => dbTx.objectStore(name).clear()),
-                                ...cleanedData.accounts.map((item) => dbTx.objectStore("accounts").put(item)),
-                                ...cleanedData.transactions.map((item) => dbTx.objectStore("transactions").put(item)),
-                                ...cleanedData.budgets.map((item) => dbTx.objectStore("budgets").put(item)),
-                                dbTx.objectStore("categories").put({ id: "main", ...cleanedData.categories }),
-                                ...(cleanedData.recurringTransactions || []).map((item) => dbTx.objectStore("recurringTransactions").put(item)),
-                                ...(cleanedData.paymentScheduleOverrides || []).map((item) => dbTx.objectStore("paymentScheduleOverrides").put(item)),
-                        ]);
-                        await dbTx.done;
+                        await db.transaction('rw', STORES, async () => {
+                                await Promise.all(STORES.map((name) => db.table(name).clear()));
+                                await Promise.all([
+                                        ...cleanedData.accounts.map((item) => db.table('accounts').put(item)),
+                                        ...cleanedData.transactions.map((item) => db.table('transactions').put(item)),
+                                        ...cleanedData.budgets.map((item) => db.table('budgets').put(item)),
+                                        db.table('categories').put({ id: 'main', ...cleanedData.categories }),
+                                        ...(cleanedData.recurringTransactions || []).map((item) => db.table('recurringTransactions').put(item)),
+                                        ...(cleanedData.paymentScheduleOverrides || []).map((item) => db.table('paymentScheduleOverrides').put(item)),
+                                ]);
+                        });
                 } catch (error) {
                         onError("Failed to import data.");
                         console.error("Import error:", error);
@@ -146,27 +146,29 @@ const DataManagementModal = ({ isOpen, onClose, finTrackData, onError }) => {
                         const defaultAccountId = accounts[0]?.id;
                         if (!defaultAccountId) { onError("No default account available to import transactions."); return; }
                         const db = await initDB();
-                        const tx = db.transaction(["transactions", "accounts"], "readwrite");
-                        let balance = (await tx.objectStore("accounts").get(defaultAccountId))?.balance || 0;
-                        for (const row of csvData) {
-                                let finalCategory = row.category;
-                                if (row.description.trim().toLowerCase() === "difference") finalCategory = "Balance Adjustment";
-                                const amount = parseFloat(row.amount);
-                                const newTx = {
-                                        id: `tx-${Date.now()}-${Math.random()}`,
-                                        accountId: defaultAccountId,
-                                        amount,
-                                        date: formatDateForInput(new Date(row.date)),
-                                        description: row.description,
-                                        type: row.type,
-                                        category: finalCategory,
-                                };
-                                await tx.objectStore("transactions").put(newTx);
-                                if (row.type === "income") balance += amount;
-                                else if (row.type === "expense") balance -= amount;
-                        }
-                        await tx.objectStore("accounts").update(defaultAccountId, { balance });
-                        await tx.done;
+                        await db.transaction('rw', ['transactions', 'accounts'], async () => {
+                                const accountsTable = db.table('accounts');
+                                const transactionsTable = db.table('transactions');
+                                let balance = (await accountsTable.get(defaultAccountId))?.balance || 0;
+                                for (const row of csvData) {
+                                        let finalCategory = row.category;
+                                        if (row.description.trim().toLowerCase() === 'difference') finalCategory = 'Balance Adjustment';
+                                        const amount = parseFloat(row.amount);
+                                        const newTx = {
+                                                id: `tx-${Date.now()}-${Math.random()}`,
+                                                accountId: defaultAccountId,
+                                                amount,
+                                                date: formatDateForInput(new Date(row.date)),
+                                                description: row.description,
+                                                type: row.type,
+                                                category: finalCategory,
+                                        };
+                                        await transactionsTable.put(newTx);
+                                        if (row.type === 'income') balance += amount;
+                                        else if (row.type === 'expense') balance -= amount;
+                                }
+                                await accountsTable.update(defaultAccountId, { balance });
+                        });
                 } catch (error) {
                         onError("Failed to import CSV data.");
                         console.error("CSV Import error:", error);
@@ -180,17 +182,17 @@ const DataManagementModal = ({ isOpen, onClose, finTrackData, onError }) => {
         const resetData = async () => {
                 try {
                         const db = await initDB();
-                        const tx = db.transaction(STORES, "readwrite");
-                        await Promise.all(STORES.map((name) => tx.objectStore(name).clear()));
-                        await Promise.all([
-                                ...initialData.accounts.map((item) => tx.objectStore("accounts").put(item)),
-                                ...initialData.transactions.map((item) => tx.objectStore("transactions").put(item)),
-                                ...initialData.budgets.map((item) => tx.objectStore("budgets").put(item)),
-                                tx.objectStore("categories").put({ id: "main", ...initialData.categories }),
-                                ...(initialData.recurringTransactions || []).map((item) => tx.objectStore("recurringTransactions").put(item)),
-                                ...(initialData.paymentScheduleOverrides || []).map((item) => tx.objectStore("paymentScheduleOverrides").put(item)),
-                        ]);
-                        await tx.done;
+                        await db.transaction('rw', STORES, async () => {
+                                await Promise.all(STORES.map((name) => db.table(name).clear()));
+                                await Promise.all([
+                                        ...initialData.accounts.map((item) => db.table('accounts').put(item)),
+                                        ...initialData.transactions.map((item) => db.table('transactions').put(item)),
+                                        ...initialData.budgets.map((item) => db.table('budgets').put(item)),
+                                        db.table('categories').put({ id: 'main', ...initialData.categories }),
+                                        ...(initialData.recurringTransactions || []).map((item) => db.table('recurringTransactions').put(item)),
+                                        ...(initialData.paymentScheduleOverrides || []).map((item) => db.table('paymentScheduleOverrides').put(item)),
+                                ]);
+                        });
                 } catch (error) {
                         onError("Failed to reset data.");
                         console.error("Reset error:", error);

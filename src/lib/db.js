@@ -32,22 +32,16 @@ export const initDB = async () => {
         }
         const hasData = await db.accounts.count();
         if (hasData === 0) {
-                // Dexie expects the transaction mode as the first argument and the
-                // list of stores as the second. The previous implementation passed
-                // the arguments in the wrong order which resulted in Dexie trying
-                // to call string methods on the stores array ("mode.replace is not a
-                // function"). Swapping the order correctly opens a readwrite
-                // transaction across all defined stores.
-                const tx = db.transaction('readwrite', STORES);
-                await Promise.all([
-                        ...initialData.accounts.map((item) => tx.objectStore('accounts').put(item)),
-                        ...initialData.transactions.map((item) => tx.objectStore('transactions').put(item)),
-                        ...initialData.budgets.map((item) => tx.objectStore('budgets').put(item)),
-                        tx.objectStore('categories').put({ id: 'main', ...initialData.categories }),
-                        ...(initialData.recurringTransactions || []).map((item) => tx.objectStore('recurringTransactions').put(item)),
-                        ...(initialData.paymentScheduleOverrides || []).map((item) => tx.objectStore('paymentScheduleOverrides').put(item)),
-                ]);
-                await tx.done;
+                await db.transaction('rw', STORES, async () => {
+                        await Promise.all([
+                                ...initialData.accounts.map((item) => db.table('accounts').put(item)),
+                                ...initialData.transactions.map((item) => db.table('transactions').put(item)),
+                                ...initialData.budgets.map((item) => db.table('budgets').put(item)),
+                                db.table('categories').put({ id: 'main', ...initialData.categories }),
+                                ...(initialData.recurringTransactions || []).map((item) => db.table('recurringTransactions').put(item)),
+                                ...(initialData.paymentScheduleOverrides || []).map((item) => db.table('paymentScheduleOverrides').put(item)),
+                        ]);
+                });
         }
         return db;
 };
