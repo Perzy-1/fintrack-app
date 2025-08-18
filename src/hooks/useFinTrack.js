@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 // Reverted to the correct named import.
 import { db, initDB } from '../lib/db';
@@ -7,6 +7,10 @@ import { addMonths, startOfMonth, endOfMonth, differenceInCalendarMonths } from 
 
 export function useFinTrack() {
   const [currency, setCurrency] = useStickyState('USD', 'fintrack-currency');
+
+  useEffect(() => {
+    initDB();
+  }, []);
 
   const finTrackData = useLiveQuery(async () => {
     await initDB();
