@@ -7,7 +7,7 @@ import { STORES, initialData } from '../../lib/constants';
 import { formatDateForInput } from '../../lib/utils';
 
 const DataManagementModal = ({ isOpen, onClose, finTrackData, onError }) => {
-	const { setAccounts, setBudgets, setTransactions, setCategories, setRecurringTransactions } = finTrackData;
+        const { accounts = [] } = finTrackData;
 	const [showReset, setShowReset] = useState(false);
 	const [showImportConfirm, setShowImportConfirm] = useState(false);
 	const [showCsvConfirm, setShowCsvConfirm] = useState(false);
@@ -61,47 +61,43 @@ const DataManagementModal = ({ isOpen, onClose, finTrackData, onError }) => {
 		event.target.value = null;
 	};
 
-	const confirmJsonImport = async () => {
-		if (!dataToImport) return;
-		try {
-			const balances = {};
-			dataToImport.accounts.forEach((acc) => { balances[acc.id] = 0; });
-			const sortedTransactions = [...dataToImport.transactions].sort((a, b) => new Date(a.date) - new Date(b.date));
-			sortedTransactions.forEach((tx) => {
-				if (tx.type === "income") { if (balances[tx.accountId] !== undefined) balances[tx.accountId] += tx.amount; }
-				else if (tx.type === "expense") { if (balances[tx.accountId] !== undefined) balances[tx.accountId] -= tx.amount; }
-				else if (tx.type === "transfer") {
-					if (balances[tx.from] !== undefined) balances[tx.from] -= tx.amount + (tx.fee || 0);
-					if (balances[tx.to] !== undefined) balances[tx.to] += tx.amount;
-				}
-			});
-			const recalculatedAccounts = dataToImport.accounts.map((acc) => ({ ...acc, balance: balances[acc.id] || 0 }));
-			const db = await initDB();
-			const dbTx = db.transaction(STORES, "readwrite");
-			await Promise.all([
-				...STORES.map((name) => dbTx.objectStore(name).clear()),
-				...recalculatedAccounts.map((item) => dbTx.objectStore("accounts").put(item)),
-				...dataToImport.transactions.map((item) => dbTx.objectStore("transactions").put(item)),
-				...dataToImport.budgets.map((item) => dbTx.objectStore("budgets").put(item)),
-				dbTx.objectStore("categories").put({ id: "main", ...dataToImport.categories }),
-				...(dataToImport.recurringTransactions || []).map((item) => dbTx.objectStore("recurringTransactions").put(item)),
-			]);
-			await dbTx.done;
-			const cleanedData = validateAndCleanData({ ...dataToImport, accounts: recalculatedAccounts });
-			setAccounts(cleanedData.accounts);
-			setTransactions(cleanedData.transactions);
-			setBudgets(cleanedData.budgets);
-			setCategories(cleanedData.categories);
-			setRecurringTransactions(cleanedData.recurringTransactions || []);
-		} catch (error) {
-			onError("Failed to import data.");
-			console.error("Import error:", error);
-		} finally {
-			setShowImportConfirm(false);
-			setDataToImport(null);
-			onClose();
-		}
-	};
+        const confirmJsonImport = async () => {
+                if (!dataToImport) return;
+                try {
+                        const balances = {};
+                        dataToImport.accounts.forEach((acc) => { balances[acc.id] = 0; });
+                        const sortedTransactions = [...dataToImport.transactions].sort((a, b) => new Date(a.date) - new Date(b.date));
+                        sortedTransactions.forEach((tx) => {
+                                if (tx.type === "income") { if (balances[tx.accountId] !== undefined) balances[tx.accountId] += tx.amount; }
+                                else if (tx.type === "expense") { if (balances[tx.accountId] !== undefined) balances[tx.accountId] -= tx.amount; }
+                                else if (tx.type === "transfer") {
+                                        if (balances[tx.from] !== undefined) balances[tx.from] -= tx.amount + (tx.fee || 0);
+                                        if (balances[tx.to] !== undefined) balances[tx.to] += tx.amount;
+                                }
+                        });
+                        const recalculatedAccounts = dataToImport.accounts.map((acc) => ({ ...acc, balance: balances[acc.id] || 0 }));
+                        const cleanedData = validateAndCleanData({ ...dataToImport, accounts: recalculatedAccounts });
+                        const db = await initDB();
+                        const dbTx = db.transaction(STORES, "readwrite");
+                        await Promise.all([
+                                ...STORES.map((name) => dbTx.objectStore(name).clear()),
+                                ...cleanedData.accounts.map((item) => dbTx.objectStore("accounts").put(item)),
+                                ...cleanedData.transactions.map((item) => dbTx.objectStore("transactions").put(item)),
+                                ...cleanedData.budgets.map((item) => dbTx.objectStore("budgets").put(item)),
+                                dbTx.objectStore("categories").put({ id: "main", ...cleanedData.categories }),
+                                ...(cleanedData.recurringTransactions || []).map((item) => dbTx.objectStore("recurringTransactions").put(item)),
+                                ...(cleanedData.paymentScheduleOverrides || []).map((item) => dbTx.objectStore("paymentScheduleOverrides").put(item)),
+                        ]);
+                        await dbTx.done;
+                } catch (error) {
+                        onError("Failed to import data.");
+                        console.error("Import error:", error);
+                } finally {
+                        setShowImportConfirm(false);
+                        setDataToImport(null);
+                        onClose();
+                }
+        };
 
 	const handleCsvFileChange = (event) => {
 		const file = event.target.files[0];
@@ -114,10 +110,10 @@ const DataManagementModal = ({ isOpen, onClose, finTrackData, onError }) => {
 				if (errors.length > 0) { onError(`CSV parsing errors: ${errors.join(", ")}`); return; }
 				setCsvData(data);
 				setShowCsvConfirm(true);
-			} catch (err) {
-				onError("Failed to parse CSV file.");
-			}
-		};
+                        } catch {
+                                onError("Failed to parse CSV file.");
+                        }
+                };
 		reader.readAsText(file);
 		event.target.value = null;
 	};
@@ -144,66 +140,65 @@ const DataManagementModal = ({ isOpen, onClose, finTrackData, onError }) => {
 		return { data, errors };
 	};
 
-	const confirmCsvImport = async () => {
-		if (!csvData) return;
-		try {
-			const defaultAccountId = finTrackData.accounts[0]?.id;
-			if (!defaultAccountId) { onError("No default account available to import transactions."); return; }
-			for (const row of csvData) {
-				let finalCategory = row.category;
-				if (row.description.trim().toLowerCase() === "difference") finalCategory = "Balance Adjustment";
-				const newTx = {
-					id: `tx-${Date.now()}-${Math.random()}`,
-					accountId: defaultAccountId,
-					amount: parseFloat(row.amount),
-					date: formatDateForInput(new Date(row.date)),
-					description: row.description,
-					type: row.type,
-					category: finalCategory,
-				};
-				await finTrackData.handleSaveTransaction(newTx);
-			}
-		} catch (error) {
-			onError("Failed to import CSV data.");
-			console.error("CSV Import error:", error);
-		} finally {
-			setShowCsvConfirm(false);
-			setCsvData(null);
-			onClose();
-		}
-	};
+        const confirmCsvImport = async () => {
+                if (!csvData) return;
+                try {
+                        const defaultAccountId = accounts[0]?.id;
+                        if (!defaultAccountId) { onError("No default account available to import transactions."); return; }
+                        const db = await initDB();
+                        const tx = db.transaction(["transactions", "accounts"], "readwrite");
+                        let balance = (await tx.objectStore("accounts").get(defaultAccountId))?.balance || 0;
+                        for (const row of csvData) {
+                                let finalCategory = row.category;
+                                if (row.description.trim().toLowerCase() === "difference") finalCategory = "Balance Adjustment";
+                                const amount = parseFloat(row.amount);
+                                const newTx = {
+                                        id: `tx-${Date.now()}-${Math.random()}`,
+                                        accountId: defaultAccountId,
+                                        amount,
+                                        date: formatDateForInput(new Date(row.date)),
+                                        description: row.description,
+                                        type: row.type,
+                                        category: finalCategory,
+                                };
+                                await tx.objectStore("transactions").put(newTx);
+                                if (row.type === "income") balance += amount;
+                                else if (row.type === "expense") balance -= amount;
+                        }
+                        await tx.objectStore("accounts").update(defaultAccountId, { balance });
+                        await tx.done;
+                } catch (error) {
+                        onError("Failed to import CSV data.");
+                        console.error("CSV Import error:", error);
+                } finally {
+                        setShowCsvConfirm(false);
+                        setCsvData(null);
+                        onClose();
+                }
+        };
 
-	const resetData = async () => {
-		try {
-			const db = await initDB();
-			const tx = db.transaction(STORES, "readwrite");
-			// Clear all stores first
-			await Promise.all(STORES.map((name) => tx.objectStore(name).clear()));
-			// After clearing, repopulate with initial data in the same transaction
-			await Promise.all([
-				...initialData.accounts.map((item) => tx.objectStore("accounts").put(item)),
-				...initialData.transactions.map((item) => tx.objectStore("transactions").put(item)),
-				...initialData.budgets.map((item) => tx.objectStore("budgets").put(item)),
-				tx.objectStore("categories").put({ id: "main", ...initialData.categories }),
-				...(initialData.recurringTransactions || []).map((item) => tx.objectStore("recurringTransactions").put(item)),
-			]);
-			await tx.done;
-
-			// Update state only after DB operations are successful
-			setAccounts(initialData.accounts);
-			setTransactions(initialData.transactions);
-			setBudgets(initialData.budgets);
-			setCategories(initialData.categories);
-			setRecurringTransactions(initialData.recurringTransactions || []);
-		} catch (error) {
-			onError("Failed to reset data.");
-			console.error("Reset error:", error);
-		} finally {
-			// Ensure modals are closed regardless of success or failure
-			setShowReset(false);
-			onClose();
-		}
-	};
+        const resetData = async () => {
+                try {
+                        const db = await initDB();
+                        const tx = db.transaction(STORES, "readwrite");
+                        await Promise.all(STORES.map((name) => tx.objectStore(name).clear()));
+                        await Promise.all([
+                                ...initialData.accounts.map((item) => tx.objectStore("accounts").put(item)),
+                                ...initialData.transactions.map((item) => tx.objectStore("transactions").put(item)),
+                                ...initialData.budgets.map((item) => tx.objectStore("budgets").put(item)),
+                                tx.objectStore("categories").put({ id: "main", ...initialData.categories }),
+                                ...(initialData.recurringTransactions || []).map((item) => tx.objectStore("recurringTransactions").put(item)),
+                                ...(initialData.paymentScheduleOverrides || []).map((item) => tx.objectStore("paymentScheduleOverrides").put(item)),
+                        ]);
+                        await tx.done;
+                } catch (error) {
+                        onError("Failed to reset data.");
+                        console.error("Reset error:", error);
+                } finally {
+                        setShowReset(false);
+                        onClose();
+                }
+        };
 
 	if (!isOpen) return null;
 

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 // Reverted to the correct named import.
-import { db } from '../lib/db';
+import { db, initDB } from '../lib/db';
 import { useStickyState } from './useStickyState';
 import { addMonths, startOfMonth, endOfMonth, differenceInCalendarMonths } from 'date-fns';
 
@@ -9,6 +9,7 @@ export function useFinTrack() {
   const [currency, setCurrency] = useStickyState('USD', 'fintrack-currency');
 
   const finTrackData = useLiveQuery(async () => {
+    await initDB();
     const accounts = await db.accounts.toArray();
     const transactions = await db.transactions.toArray();
     const categories = await db.categories.toArray();
@@ -23,7 +24,7 @@ export function useFinTrack() {
       transactions,
       categories,
       budgets,
-      recurring,
+      recurringTransactions: recurring,
     };
   }, []);
 
@@ -34,7 +35,7 @@ export function useFinTrack() {
     transactions = [],
     categories = [],
     budgets = [],
-    recurring: recurringTransactions = [],
+    recurringTransactions = [],
   } = finTrackData || {};
 
   const [error, setError] = useState(null);
@@ -87,7 +88,7 @@ export function useFinTrack() {
     transactions,
     categories,
     budgets,
-    recurring: recurringTransactions,
+    recurringTransactions,
     currency,
     setCurrency,
     error,

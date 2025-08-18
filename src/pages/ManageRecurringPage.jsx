@@ -5,7 +5,7 @@ import { Plus, Edit, Trash2, Repeat } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 
 const ManageRecurringPage = ({ finTrackData, recurringModalControls }) => {
-	const { recurringTransactions, handleDeleteRecurringTransaction } = finTrackData;
+        const { recurringTransactions = [], handleDeleteRecurringTransaction } = finTrackData;
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
 
 	const handleDeleteRequest = (recTxId) => {

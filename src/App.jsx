@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { useFinTrack } from './hooks/useFinTrack';
 import { useIsMobile } from './hooks/useIsMobile';
@@ -8,6 +8,7 @@ import Header from './components/common/Header';
 import BottomNav from './components/common/BottomNav';
 import TransactionModal from './components/modals/TransactionModal';
 import RecurringTransactionModal from './components/modals/RecurringTransactionModal';
+import DataManagementModal from './components/modals/DataManagementModal';
 import ErrorBannerSystem from './components/common/ErrorBannerSystem';
 import DashboardPage from './pages/DashboardPage';
 import TransactionsPage from './pages/TransactionsPage';
@@ -27,7 +28,7 @@ function App() {
     transactions,
     categories,
     budgets,
-    recurring,
+    recurringTransactions,
     currency,
     setCurrency,
     error,
@@ -93,7 +94,7 @@ function App() {
     transactions,
     categories,
     budgets,
-    recurring,
+    recurringTransactions,
     currency,
     calculatedData,
     handleDeleteAccount,
@@ -109,6 +110,8 @@ function App() {
     budgetModalControls,
     categoryModalControls,
   };
+
+  const [isDataModalOpen, setDataModalOpen] = useState(false);
 
   const accountRoutes = accounts.map((account) => {
     const PageComponent = account.type === 'loan' ? LoanDetailPage : AccountDetailPage;
@@ -148,7 +151,7 @@ function App() {
                     setWeekStartsOn={setWeekStartsOn}
                     monthStartsOn={monthStartsOn}
                     setMonthStartsOn={setMonthStartsOn}
-                    onDataManagementClick={() => addError('Data management is not yet implemented.')}
+                    onDataManagementClick={() => setDataModalOpen(true)}
                   />
                 }
               />
@@ -160,6 +163,7 @@ function App() {
           </main>
           <TransactionModal {...txModalControls} accounts={accounts} categories={categories} currency={currency} addError={addError} />
           <RecurringTransactionModal {...recurringModalControls} accounts={accounts} categories={categories} currency={currency} addError={addError} />
+          <DataManagementModal isOpen={isDataModalOpen} onClose={() => setDataModalOpen(false)} finTrackData={finTrackData} onError={addError} />
         </div>
         {isMobile && <BottomNav />}
       </div>
