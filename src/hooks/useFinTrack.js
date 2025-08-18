@@ -15,12 +15,15 @@ export function useFinTrack() {
     const budgets = await db.budgets.toArray();
     const recurring = await db.recurringTransactions.toArray();
 
+    // Return the loaded data directly. "recurring" is already the array of
+    // recurring transactions, so expose it under the same name to keep the
+    // shape consistent with how the rest of the application expects it.
     return {
       accounts,
       transactions,
       categories,
       budgets,
-      recurring: recurringTransactions,
+      recurring,
     };
   }, []);
 

@@ -1,12 +1,14 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Card from '../components/common/Card';
 import AccountItem from '../components/accounts/AccountItem';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import { Plus } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 
-const AccountsPage = ({ finTrackData, accountModalControls, navigate }) => {
-	const { accounts, transactions, currency, handleDeleteAccount } = finTrackData;
+const AccountsPage = ({ finTrackData, accountModalControls }) => {
+        const navigate = useNavigate();
+        const { accounts, transactions, currency, handleDeleteAccount } = finTrackData;
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
 
 	const { assetAccounts, liabilityAccounts, totalAssets, totalLiabilities, loanAccounts } = useMemo(() => {

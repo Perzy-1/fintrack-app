@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { useFinTrack } from './hooks/useFinTrack';
 import { useIsMobile } from './hooks/useIsMobile';
+import { useStickyState } from './hooks/useStickyState';
 import Sidebar from './components/common/Sidebar';
 import Header from './components/common/Header';
 import BottomNav from './components/common/BottomNav';
@@ -37,7 +38,33 @@ function App() {
     recurringModalControls
   } = useFinTrack();
 
+  // Persisted UI settings used by the Settings page
+  const [theme, setTheme] = useStickyState('system', 'fintrack-theme');
+  const [budgetDisplay, setBudgetDisplay] = useStickyState('ratio', 'fintrack-budget-display');
+  const [weekStartsOn, setWeekStartsOn] = useStickyState('Sunday', 'fintrack-week-start');
+  const [monthStartsOn, setMonthStartsOn] = useStickyState(1, 'fintrack-month-start');
+
   const isMobile = useIsMobile();
+
+  // Basic calculated data for the dashboard (net worth, assets, etc.)
+  const calculatedData = useMemo(() => {
+    const assetTypes = ['Debit Card', 'Credit Card', 'Savings', 'Cash'];
+    const totalAssets = accounts
+      .filter((a) => assetTypes.includes(a.type))
+      .reduce((sum, a) => sum + a.balance, 0);
+    const totalLoans = accounts
+      .filter((a) => a.type === 'Loan')
+      .reduce((sum, a) => sum + a.balance, 0);
+    const totalLiabilities = accounts
+      .filter((a) => a.type === 'Liability')
+      .reduce((sum, a) => sum + a.balance, 0);
+    return {
+      totalAssets,
+      totalLoans,
+      totalLiabilities,
+      netWorth: totalAssets + totalLoans - totalLiabilities,
+    };
+  }, [accounts]);
 
   if (isLoading) {
     return (
@@ -47,16 +74,40 @@ function App() {
     );
   }
 
-  const pageProps = {
+  // Stub handlers for features that haven't been wired up yet. These
+  // functions prevent runtime errors when the corresponding UI actions are
+  // triggered and surface a helpful message instead.
+  const handleDeleteAccount = async () => addError('Account deletion is not yet implemented.');
+  const handleDeleteCategory = () => addError('Category deletion is not yet implemented.');
+  const handleDeleteRecurringTransaction = () => addError('Recurring transaction deletion is not yet implemented.');
+
+  const accountModalControls = { open: () => addError('Account modal is not yet implemented.') };
+  const budgetModalControls = { open: () => addError('Budget modal is not yet implemented.') };
+  const categoryModalControls = {
+    open: () => addError('Category modal is not yet implemented.'),
+    edit: () => addError('Category modal is not yet implemented.'),
+  };
+
+  const finTrackData = {
     accounts,
     transactions,
     categories,
     budgets,
     recurring,
     currency,
+    calculatedData,
+    handleDeleteAccount,
+    handleDeleteCategory,
+    handleDeleteRecurringTransaction,
+  };
+
+  const pageProps = {
+    finTrackData,
     txModalControls,
     recurringModalControls,
-    addError
+    accountModalControls,
+    budgetModalControls,
+    categoryModalControls,
   };
 
   const accountRoutes = accounts.map((account) => {
@@ -65,14 +116,14 @@ function App() {
       <Route
         key={account.id}
         path={`/accounts/${account.id}`}
-        element={<PageComponent {...pageProps} />}
+        element={<PageComponent account={account} {...pageProps} />}
       />
     );
   });
 
   return (
     <Router basename={import.meta.env.BASE_URL}>
-      <div className="flex h-screen bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
+      <div className="flex h-screen bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-200 md:pl-64">
         {!isMobile && <Sidebar />}
         <div className="flex flex-1 flex-col">
           <Header />
@@ -82,10 +133,27 @@ function App() {
               <Route path="/" element={<DashboardPage {...pageProps} />} />
               <Route path="/transactions" element={<TransactionsPage {...pageProps} />} />
               <Route path="/accounts" element={<AccountsPage {...pageProps} />} />
-              <Route path="/budgets" element={<BudgetsPage {...pageProps} addError={addError} />} />
-              <Route path="/settings" element={<SettingsPage currency={currency} setCurrency={setCurrency} addError={addError} />} />
-              <Route path="/manage/accounts" element={<ManageAccountsPage addError={addError} />} />
-              <Route path="/manage/categories" element={<ManageCategoriesPage addError={addError} />} />
+              <Route path="/budgets" element={<BudgetsPage {...pageProps} budgetDisplay={budgetDisplay} />} />
+              <Route
+                path="/settings"
+                element={
+                  <SettingsPage
+                    theme={theme}
+                    setTheme={setTheme}
+                    currency={currency}
+                    setCurrency={setCurrency}
+                    budgetDisplay={budgetDisplay}
+                    setBudgetDisplay={setBudgetDisplay}
+                    weekStartsOn={weekStartsOn}
+                    setWeekStartsOn={setWeekStartsOn}
+                    monthStartsOn={monthStartsOn}
+                    setMonthStartsOn={setMonthStartsOn}
+                    onDataManagementClick={() => addError('Data management is not yet implemented.')}
+                  />
+                }
+              />
+              <Route path="/manage/accounts" element={<ManageAccountsPage {...pageProps} />} />
+              <Route path="/manage/categories" element={<ManageCategoriesPage {...pageProps} />} />
               <Route path="/manage/recurring" element={<ManageRecurringPage {...pageProps} />} />
               {accountRoutes}
             </Routes>

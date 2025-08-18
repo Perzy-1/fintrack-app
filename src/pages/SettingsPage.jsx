@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import Card from '../components/common/Card';
 import ManagementButton from '../components/common/ManagementButton';
 import { currencyMap } from '../lib/constants';
@@ -48,23 +49,24 @@ const GeneralSettings = ({ weekStartsOn, setWeekStartsOn, monthStartsOn, setMont
 	</Card>
 );
 
-const SettingsPage = ({ theme, setTheme, currency, setCurrency, budgetDisplay, setBudgetDisplay, weekStartsOn, setWeekStartsOn, monthStartsOn, setMonthStartsOn, navigate, onDataManagementClick }) => {
-	return (
-		<div className="p-4 md:p-6 space-y-6">
-			<AppearanceSettings theme={theme} setTheme={setTheme} currency={currency} setCurrency={setCurrency} budgetDisplay={budgetDisplay} setBudgetDisplay={setBudgetDisplay} />
-			<GeneralSettings weekStartsOn={weekStartsOn} setWeekStartsOn={setWeekStartsOn} monthStartsOn={monthStartsOn} setMonthStartsOn={setMonthStartsOn} />
-			<Card>
-				<h3 className="text-lg font-semibold mb-4">Management</h3>
-				<div className="space-y-3">
-					<ManagementButton onClick={() => navigate("manageAccounts")} icon={Wallet} label="Manage Accounts" />
-					<ManagementButton onClick={() => navigate("manageCategories")} icon={BarChart2} label="Manage Categories" />
-					<ManagementButton onClick={() => navigate("manageRecurring")} icon={Repeat} label="Recurring Transactions" />
-					<ManagementButton onClick={onDataManagementClick} icon={Database} label="Data Management" />
-				</div>
-			</Card>
-			<div className="text-center text-xs text-gray-400 dark:text-gray-500 mt-4">Version: 1.0.3</div>
-		</div>
-	);
+const SettingsPage = ({ theme, setTheme, currency, setCurrency, budgetDisplay, setBudgetDisplay, weekStartsOn, setWeekStartsOn, monthStartsOn, setMonthStartsOn, onDataManagementClick }) => {
+        const navigate = useNavigate();
+        return (
+                <div className="p-4 md:p-6 space-y-6">
+                        <AppearanceSettings theme={theme} setTheme={setTheme} currency={currency} setCurrency={setCurrency} budgetDisplay={budgetDisplay} setBudgetDisplay={setBudgetDisplay} />
+                        <GeneralSettings weekStartsOn={weekStartsOn} setWeekStartsOn={setWeekStartsOn} monthStartsOn={monthStartsOn} setMonthStartsOn={setMonthStartsOn} />
+                        <Card>
+                                <h3 className="text-lg font-semibold mb-4">Management</h3>
+                                <div className="space-y-3">
+                                        <ManagementButton onClick={() => navigate("/manage/accounts")} icon={Wallet} label="Manage Accounts" />
+                                        <ManagementButton onClick={() => navigate("/manage/categories")} icon={BarChart2} label="Manage Categories" />
+                                        <ManagementButton onClick={() => navigate("/manage/recurring")} icon={Repeat} label="Recurring Transactions" />
+                                        <ManagementButton onClick={onDataManagementClick} icon={Database} label="Data Management" />
+                                </div>
+                        </Card>
+                        <div className="text-center text-xs text-gray-400 dark:text-gray-500 mt-4">Version: 1.0.3</div>
+                </div>
+        );
 };
 
 export default SettingsPage;
