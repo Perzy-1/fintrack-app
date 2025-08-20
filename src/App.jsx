@@ -91,7 +91,7 @@ import {
 
 // --- DATABASE & MIGRATION LOGIC ---
 const DB_NAME = "fintrack-db";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORES = [
 	"accounts",
 	"transactions",
@@ -99,6 +99,8 @@ const STORES = [
 	"categories",
 	"recurringTransactions",
 	"appSettings",
+	"savingsGoals",
+	"savingsSettings",
 ];
 
 // --- INITIAL & DEFAULT DATA ---
@@ -195,12 +197,79 @@ const initialTransactions = [
 		description: "Internet Bill",
 	},
 ];
+// Initial savings goals data
+const initialSavingsGoals = [
+	{
+		id: "goal-1",
+		name: "Aircon",
+		targetAmount: 12500,
+		priority: 1,
+		createdDate: formatDateForInput(new Date()),
+		isCompleted: false,
+		completedDate: null,
+		allocatedAmount: 0,
+	},
+	{
+		id: "goal-2",
+		name: "Desk setup",
+		targetAmount: 11000,
+		priority: 2,
+		createdDate: formatDateForInput(new Date()),
+		isCompleted: false,
+		completedDate: null,
+		allocatedAmount: 0,
+	},
+	{
+		id: "goal-3",
+		name: "Apple Watch",
+		targetAmount: 25000,
+		priority: 3,
+		createdDate: formatDateForInput(new Date()),
+		isCompleted: false,
+		completedDate: null,
+		allocatedAmount: 0,
+	},
+	{
+		id: "goal-4",
+		name: "Cellphone",
+		targetAmount: 60000,
+		priority: 4,
+		createdDate: formatDateForInput(new Date()),
+		isCompleted: false,
+		completedDate: null,
+		allocatedAmount: 0,
+	},
+];
+
+// Initial savings settings
+const initialSavingsSettings = {
+	id: "main",
+	payDates: [13, 28], // Cutoff dates
+	incomeMode: "range", // "fixed", "range", "average"
+	incomePerCutoff: {
+		min: 13000,
+		max: 13500,
+		fixed: 13250,
+	},
+	essentialsMode: "percentage", // "fixed", "percentage"
+	essentialsPercentage: 50, // 50% of monthly income for essentials
+	fixedBills: [
+		{ name: "Rent", amount: 5150, dueDate: 1 },
+		{ name: "Utilities", amount: 1500, dueDate: 5 },
+		{ name: "Internet", amount: 650, dueDate: 10 },
+	],
+	accountRules: {},
+	useActualData: false, // Whether to use actual transaction data instead of settings
+};
+
 const initialData = {
 	accounts: initialAccounts,
 	transactions: initialTransactions,
 	budgets: initialBudgets,
 	categories: defaultCategories,
 	recurringTransactions: [],
+	savingsGoals: initialSavingsGoals,
+	savingsSettings: initialSavingsSettings,
 };
 
 const initDB = async () => {
@@ -560,10 +629,12 @@ const useFinTrack = () => {
 	const [recurringTransactions, setRecurringTransactions] = useState(
 		initialData.recurringTransactions,
 	);
+	const [savingsGoals, setSavingsGoals] = useState(initialData.savingsGoals);
+	const [savingsSettings, setSavingsSettings] = useState(initialData.savingsSettings);
 	const [notifications, setNotifications] = useState(initialNotifications);
 	const [isDbLoading, setIsDbLoading] = useState(true);
 
-	useEffect(() => {
+		useEffect(() => {
 		const loadData = async () => {
 			setIsDbLoading(true);
 			try {
@@ -578,6 +649,10 @@ const useFinTrack = () => {
 							(await db.get("categories", "main")) || defaultCategories,
 						recurringTransactions:
 							(await db.getAll("recurringTransactions")) || [],
+						savingsGoals:
+							(await db.getAll("savingsGoals")) || [],
+						savingsSettings:
+							(await db.get("savingsSettings", "main")) || initialData.savingsSettings,
 					};
 					const cleanedData = validateAndCleanData(loadedData);
 					setAccounts(cleanedData.accounts);
@@ -585,6 +660,8 @@ const useFinTrack = () => {
 					setBudgets(cleanedData.budgets);
 					setCategories(cleanedData.categories);
 					setRecurringTransactions(cleanedData.recurringTransactions);
+					setSavingsGoals(cleanedData.savingsGoals || []);
+					setSavingsSettings(cleanedData.savingsSettings || initialData.savingsSettings);
 				} else {
 					const db = await initDB();
 					const tx = db.transaction(STORES, "readwrite");
@@ -604,6 +681,12 @@ const useFinTrack = () => {
 						...initialData.recurringTransactions.map((item) =>
 							tx.objectStore("recurringTransactions").put(item),
 						),
+						...initialData.savingsGoals.map((item) =>
+							tx.objectStore("savingsGoals").put(item),
+						),
+						tx
+							.objectStore("savingsSettings")
+							.put({ id: "main", ...initialData.savingsSettings }),
 					]);
 					await tx.done;
 					setAccounts(initialData.accounts);
@@ -611,6 +694,8 @@ const useFinTrack = () => {
 					setBudgets(initialData.budgets);
 					setCategories(initialData.categories);
 					setRecurringTransactions(initialData.recurringTransactions);
+					setSavingsGoals(initialData.savingsGoals);
+					setSavingsSettings(initialData.savingsSettings);
 				}
 			} catch (error) {
 				console.error("Failed to load data from DB:", error);
@@ -657,49 +742,47 @@ const useFinTrack = () => {
 	}, [budgets, isDbLoading]);
 
 	const calculatedData = useMemo(() => {
+		// Calculate balances from initial account balance plus transactions
 		const currentBalances = accounts.reduce((acc, account) => {
+			// Start with the stored balance as the initial balance
+			// This represents the balance before any transactions in our system
 			let balance = account.balance;
-			// Note: This is a simplified balance calculation. For production,
-			// it's better to calculate balance from transactions against an initial balance.
-			// This implementation assumes `account.balance` is a snapshot and transactions modify it.
+			
+			// Add all transaction effects for this account
+			transactions.forEach((tx) => {
+				if (tx.accountId === account.id) {
+					if (tx.type === "income") {
+						balance += tx.amount;
+					} else if (tx.type === "expense") {
+						balance -= tx.amount;
+					}
+				} else if (tx.type === "transfer") {
+					if (tx.from === account.id) {
+						balance -= tx.amount + (tx.fee || 0);
+					} else if (tx.to === account.id) {
+						balance += tx.amount;
+					}
+				}
+			});
+			
 			acc[account.id] = balance;
 			return acc;
 		}, {});
 
-		const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+		const totalBalance = Object.values(currentBalances).reduce((sum, balance) => sum + balance, 0);
 
 		return { accountBalances: currentBalances, totalBalance };
-	}, [accounts]);
+	}, [accounts, transactions]);
 
 	const handleSaveTransaction = async (newTx) => {
 		const db = await initDB();
 		await db.put("transactions", newTx);
 		const allTxs = await db.getAll("transactions");
 		setTransactions(allTxs);
-		// Update account balance
-		const tx = db.transaction("accounts", "readwrite");
-		if (newTx.type === "transfer") {
-			const fromAccount = await tx.store.get(newTx.from);
-			const toAccount = await tx.store.get(newTx.to);
-			await tx.store.put({
-				...fromAccount,
-				balance: fromAccount.balance - newTx.amount - (newTx.fee || 0),
-			});
-			await tx.store.put({
-				...toAccount,
-				balance: toAccount.balance + newTx.amount,
-			});
-		} else {
-			const account = await tx.store.get(newTx.accountId);
-			const newBalance =
-				newTx.type === "income"
-					? account.balance + newTx.amount
-					: account.balance - newTx.amount;
-			await tx.store.put({ ...account, balance: newBalance });
-		}
-		await tx.done;
-		const allAccounts = await db.getAll("accounts");
-		setAccounts(allAccounts);
+		
+		// Note: We don't update account balances here anymore since calculatedData
+		// now computes them from transactions. This ensures consistency.
+		// The stored account balance serves as the initial balance only.
 	};
 
 	const handleDeleteTransaction = async (txId) => {
@@ -708,45 +791,12 @@ const useFinTrack = () => {
 
 		if (!txToDelete) return;
 
-		// Revert balance changes
-		const accountTx = db.transaction("accounts", "readwrite");
-		if (txToDelete.type === "transfer") {
-			const fromAccount = await accountTx.store.get(txToDelete.from);
-			const toAccount = await accountTx.store.get(txToDelete.to);
-			if (fromAccount) {
-				await accountTx.store.put({
-					...fromAccount,
-					balance:
-						fromAccount.balance + txToDelete.amount + (txToDelete.fee || 0),
-				});
-			}
-			if (toAccount) {
-				await accountTx.store.put({
-					...toAccount,
-					balance: toAccount.balance - txToDelete.amount,
-				});
-			}
-		} else {
-			const account = await accountTx.store.get(txToDelete.accountId);
-			if (account) {
-				const revertedBalance =
-					txToDelete.type === "income"
-						? account.balance - txToDelete.amount
-						: account.balance + txToDelete.amount;
-				await accountTx.store.put({ ...account, balance: revertedBalance });
-			}
-		}
-
-		await accountTx.done;
-
 		// Delete the transaction
 		await db.delete("transactions", txId);
 
-		// Update state
+		// Update state - balances will be recalculated automatically by calculatedData
 		const allTxs = await db.getAll("transactions");
-		const allAccounts = await db.getAll("accounts");
 		setTransactions(allTxs);
-		setAccounts(allAccounts);
 	};
 
 	const handleSaveBudget = (newBudget) => {
@@ -819,6 +869,27 @@ const useFinTrack = () => {
 		);
 	};
 
+	const handleSaveSavingsGoal = (newGoal) => {
+		const index = savingsGoals.findIndex((g) => g.id === newGoal.id);
+		let updated;
+		if (index > -1) {
+			updated = [...savingsGoals];
+			updated[index] = newGoal;
+		} else {
+			updated = [...savingsGoals, newGoal];
+		}
+		updateStateAndDB("savingsGoals", updated, setSavingsGoals);
+	};
+
+	const handleDeleteSavingsGoal = (goalId) => {
+		const updated = savingsGoals.filter((g) => g.id !== goalId);
+		updateStateAndDB("savingsGoals", updated, setSavingsGoals);
+	};
+
+	const handleUpdateSavingsSettings = (newSettings) => {
+		updateStateAndDB("savingsSettings", newSettings, setSavingsSettings);
+	};
+
 	return {
 		accounts,
 		setAccounts,
@@ -834,6 +905,11 @@ const useFinTrack = () => {
 		setRecurringTransactions,
 		handleSaveRecurringTransaction,
 		handleDeleteRecurringTransaction,
+		savingsGoals,
+		savingsSettings,
+		handleSaveSavingsGoal,
+		handleDeleteSavingsGoal,
+		handleUpdateSavingsSettings,
 		isDbLoading,
 		calculatedData,
 		handleSaveTransaction,
@@ -993,6 +1069,7 @@ const BottomNav = ({ activeView, onTabClick }) => {
 		{ name: "Dashboard", icon: Home, view: "dashboard" },
 		{ name: "Transactions", icon: History, view: "transactions" },
 		{ name: "Budgets", icon: BarChart2, view: "budgets" },
+		{ name: "Savings", icon: PiggyBank, view: "savings" },
 		{ name: "Accounts", icon: Wallet, view: "accounts" },
 	];
 	return (
@@ -1002,7 +1079,7 @@ const BottomNav = ({ activeView, onTabClick }) => {
 					type="button"
 					key={item.name}
 					onClick={() => onTabClick(item.view)}
-					className={`flex flex-col items-center space-y-1 w-20 ${activeView === item.view ? "text-indigo-600 dark:text-indigo-400" : "text-gray-500 dark:text-gray-400"}`}
+					className={`flex flex-col items-center space-y-1 flex-1 ${activeView === item.view ? "text-indigo-600 dark:text-indigo-400" : "text-gray-500 dark:text-gray-400"}`}
 				>
 					<item.icon className="h-6 w-6" />
 					<span className="text-xs">{item.name}</span>
@@ -1016,6 +1093,7 @@ const Sidebar = ({ activeView, onTabClick }) => {
 		{ name: "Dashboard", icon: Home, view: "dashboard" },
 		{ name: "Transactions", icon: History, view: "transactions" },
 		{ name: "Budgets", icon: BarChart2, view: "budgets" },
+		{ name: "Savings", icon: PiggyBank, view: "savings" },
 		{ name: "Accounts", icon: Wallet, view: "accounts" },
 		{ name: "Settings", icon: Settings, view: "settings" },
 	];
@@ -1987,6 +2065,1355 @@ const CategoryModal = ({
 	);
 };
 
+// --- SAVINGS ALLOCATION SYSTEM ---
+const useSavingsAllocation = (finTrackData) => {
+	const { savingsGoals, savingsSettings, accounts, transactions } = finTrackData;
+	
+	// Calculate available savings based on settings and actual data
+	const calculateAvailableSavings = useMemo(() => {
+		const today = new Date();
+		const currentMonth = today.getMonth();
+		const currentYear = today.getFullYear();
+		
+		// Get current month's transactions
+		const monthStart = new Date(currentYear, currentMonth, 1);
+		const monthEnd = new Date(currentYear, currentMonth + 1, 0);
+		
+		const monthTransactions = transactions.filter(tx => {
+			const txDate = new Date(tx.date + 'T00:00:00');
+			return txDate >= monthStart && txDate <= monthEnd;
+		});
+		
+		// Calculate actual income and expenses
+		let actualIncome = 0;
+		let actualExpenses = 0;
+		
+		monthTransactions.forEach(tx => {
+			if (tx.type === 'income' && !tx.category.includes('Balance')) {
+				actualIncome += tx.amount;
+			} else if (tx.type === 'expense' && !tx.category.includes('Balance')) {
+				actualExpenses += tx.amount;
+			}
+		});
+		
+		// Use settings for prediction if available, otherwise use actual data
+		let projectedIncome = actualIncome;
+		let projectedExpenses = actualExpenses;
+		
+		if (savingsSettings && savingsSettings.incomePerCutoff) {
+			const { incomeMode, incomePerCutoff } = savingsSettings;
+			projectedIncome = incomeMode === 'fixed' 
+				? incomePerCutoff.fixed * 2 // 2 cutoffs per month
+				: incomeMode === 'range'
+					? ((incomePerCutoff.min + incomePerCutoff.max) / 2) * 2
+					: actualIncome || 26000; // fallback
+						
+			// Calculate projected expenses from settings
+			const essentials = savingsSettings.essentialsMode === 'percentage'
+				? projectedIncome * (savingsSettings.essentialsPercentage / 100)
+				: actualExpenses || 13000; // fallback
+				
+			// Add fixed bills
+			const fixedBills = savingsSettings.fixedBills?.reduce((sum, bill) => sum + bill.amount, 0) || 0;
+			projectedExpenses = essentials + fixedBills;
+		}
+		
+		// Calculate available savings (projected - actual to account for remaining month)
+		const remainingSavings = Math.max(0, projectedIncome - projectedExpenses);
+		
+		// Get savings account balances
+		const savingsAccounts = accounts.filter(acc => acc.type === 'Savings');
+		const totalSavingsBalance = savingsAccounts.reduce((sum, acc) => sum + acc.balance, 0);
+		
+		return {
+			projectedIncome,
+			projectedExpenses,
+			remainingSavings,
+			totalSavingsBalance,
+			savingsAccounts
+		};
+	}, [transactions, savingsSettings, accounts]);
+	
+	// Calculate optimal allocation for goals
+	const calculateOptimalAllocation = useMemo(() => {
+		if (!savingsGoals.length) return [];
+		
+		const activeGoals = savingsGoals
+			.filter(goal => !goal.isCompleted)
+			.sort((a, b) => a.priority - b.priority);
+		
+		if (!activeGoals.length) return [];
+		
+		const availableFunds = calculateAvailableSavings.remainingSavings;
+		if (availableFunds <= 0) return [];
+		
+		// Priority-based allocation
+		const allocations = [];
+		let remainingFunds = availableFunds;
+		
+		// First pass: minimum allocation for each goal
+		const minAllocation = Math.min(1000, availableFunds / activeGoals.length);
+		
+		activeGoals.forEach(goal => {
+			const remaining = goal.targetAmount - (goal.allocatedAmount || 0);
+			const allocation = Math.min(minAllocation, remaining, remainingFunds);
+			
+			if (allocation > 0) {
+				allocations.push({
+					goal,
+					allocation,
+					remaining: remaining - allocation
+				});
+				remainingFunds -= allocation;
+			}
+		});
+		
+		// Second pass: distribute remaining funds by priority
+		while (remainingFunds > 100 && allocations.some(a => a.remaining > 0)) {
+			for (let i = 0; i < allocations.length && remainingFunds > 100; i++) {
+				const alloc = allocations[i];
+				if (alloc.remaining > 0) {
+					const additionalAmount = Math.min(500, alloc.remaining, remainingFunds);
+					alloc.allocation += additionalAmount;
+					alloc.remaining -= additionalAmount;
+					remainingFunds -= additionalAmount;
+				}
+			}
+		}
+		
+		return allocations;
+	}, [savingsGoals, calculateAvailableSavings]);
+	
+	return {
+		calculateAvailableSavings,
+		calculateOptimalAllocation
+	};
+};
+
+const SavingsAllocationModal = ({ isOpen, onClose, finTrackData, onError }) => {
+	const { calculateAvailableSavings, calculateOptimalAllocation } = useSavingsAllocation(finTrackData);
+	const { savingsSettings, accounts } = finTrackData;
+	const [selectedAccount, setSelectedAccount] = useState('');
+	const [customAllocations, setCustomAllocations] = useState([]);
+	const [isProcessing, setIsProcessing] = useState(false);
+	
+	const savingsAccounts = accounts.filter(acc => acc.type === 'Savings');
+	const defaultAccount = savingsSettings?.accountRules?.defaultSavingsAccount || savingsAccounts[0]?.id || '';
+	
+	useEffect(() => {
+		if (isOpen) {
+			setSelectedAccount(defaultAccount);
+			setCustomAllocations(calculateOptimalAllocation.map(alloc => ({
+				goalId: alloc.goal.id,
+				amount: alloc.allocation,
+				originalAllocation: alloc.allocation
+			})));
+		}
+	}, [isOpen, defaultAccount, calculateOptimalAllocation]);
+	
+	const totalAllocation = customAllocations.reduce((sum, alloc) => sum + alloc.amount, 0);
+	const availableFunds = calculateAvailableSavings.remainingSavings;
+	
+	const handleAllocationChange = (goalId, newAmount) => {
+		setCustomAllocations(prev => prev.map(alloc => 
+			alloc.goalId === goalId 
+				? { ...alloc, amount: Math.max(0, newAmount) }
+				: alloc
+		));
+	};
+	
+	const handleResetToOptimal = () => {
+		setCustomAllocations(calculateOptimalAllocation.map(alloc => ({
+			goalId: alloc.goal.id,
+			amount: alloc.allocation,
+			originalAllocation: alloc.allocation
+		})));
+	};
+	
+	const handleExecuteAllocation = async () => {
+		if (!selectedAccount) {
+			onError('Please select a savings account.');
+			return;
+		}
+		
+		if (totalAllocation <= 0) {
+			onError('No allocations to process.');
+			return;
+		}
+		
+		const account = accounts.find(acc => acc.id === selectedAccount);
+		if (!account || account.balance < totalAllocation) {
+			onError('Insufficient funds in selected savings account.');
+			return;
+		}
+		
+		setIsProcessing(true);
+		
+		try {
+			// Process each allocation
+			for (const alloc of customAllocations.filter(a => a.amount > 0)) {
+				const goal = finTrackData.savingsGoals.find(g => g.id === alloc.goalId);
+				if (!goal) continue;
+				
+				// Create transaction for the allocation with a small delay to ensure unique IDs
+				await new Promise(resolve => setTimeout(resolve, 10));
+				
+				const transaction = {
+					id: `tx-alloc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+					type: 'expense',
+					accountId: selectedAccount,
+					amount: alloc.amount,
+					date: formatDateForInput(new Date()),
+					description: `Auto-allocation to ${goal.name}`,
+					category: 'Balance Adjustment',
+					savingsGoalId: goal.id // Link to goal for tracking
+				};
+				
+				// Update goal progress
+				const updatedGoal = {
+					...goal,
+					allocatedAmount: (goal.allocatedAmount || 0) + alloc.amount,
+					isCompleted: (goal.allocatedAmount || 0) + alloc.amount >= goal.targetAmount,
+					completedDate: (goal.allocatedAmount || 0) + alloc.amount >= goal.targetAmount 
+						? formatDateForInput(new Date()) : goal.completedDate
+				};
+				
+				// Save transaction and update goal
+				try {
+					await finTrackData.handleSaveTransaction(transaction);
+					finTrackData.handleSaveSavingsGoal(updatedGoal);
+				} catch (txError) {
+					console.error('Error saving transaction or goal:', txError);
+					throw txError;
+				}
+			}
+			
+			onClose();
+		} catch (error) {
+			console.error('Allocation execution failed:', error);
+			onError('Failed to execute allocation. Please try again.');
+		} finally {
+			setIsProcessing(false);
+		}
+	};
+	
+	if (!isOpen) return null;
+	
+	return (
+		<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+			<Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+				<div className="flex justify-between items-center mb-6">
+					<h2 className="text-xl font-semibold text-gray-800 dark:text-white">Automatic Savings Allocation</h2>
+					<button type="button" onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full">
+						<X className="h-6 w-6 text-gray-500 dark:text-gray-400" />
+					</button>
+				</div>
+				
+				{/* Summary Section */}
+				<div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+					<h3 className="font-semibold mb-3 text-gray-800 dark:text-white">Allocation Summary</h3>
+					<div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+						<div className="text-center">
+							<p className="text-gray-500 dark:text-gray-400">Available Savings</p>
+							<p className="font-semibold text-green-600 dark:text-green-400">
+								{formatCurrency(availableFunds, finTrackData.currency)}
+							</p>
+						</div>
+						<div className="text-center">
+							<p className="text-gray-500 dark:text-gray-400">Total Allocation</p>
+							<p className="font-semibold text-blue-600 dark:text-blue-400">
+								{formatCurrency(totalAllocation, finTrackData.currency)}
+							</p>
+						</div>
+						<div className="text-center">
+							<p className="text-gray-500 dark:text-gray-400">Remaining</p>
+							<p className="font-semibold text-gray-800 dark:text-gray-200">
+								{formatCurrency(availableFunds - totalAllocation, finTrackData.currency)}
+							</p>
+						</div>
+						<div className="text-center">
+							<p className="text-gray-500 dark:text-gray-400">Active Goals</p>
+							<p className="font-semibold text-gray-800 dark:text-gray-200">{customAllocations.length}</p>
+						</div>
+					</div>
+				</div>
+				
+				{/* Account Selection */}
+				<div className="mb-6">
+					<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Source Account</label>
+					<select
+						value={selectedAccount}
+						onChange={(e) => setSelectedAccount(e.target.value)}
+						className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+					>
+						<option value="">Select savings account...</option>
+						{savingsAccounts.map(account => (
+							<option key={account.id} value={account.id}>
+								{account.name} - {formatCurrency(account.balance, finTrackData.currency)}
+							</option>
+						))}
+					</select>
+				</div>
+				
+				{/* Allocations List */}
+				{customAllocations.length > 0 ? (
+					<div className="mb-6">
+						<div className="flex justify-between items-center mb-4">
+							<h3 className="font-semibold text-gray-800 dark:text-white">Goal Allocations</h3>
+							<button
+								type="button"
+								onClick={handleResetToOptimal}
+								className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors"
+							>
+								Reset to Optimal
+							</button>
+						</div>
+						<div className="space-y-3">
+							{customAllocations.map(alloc => {
+								const goal = finTrackData.savingsGoals.find(g => g.id === alloc.goalId);
+								if (!goal) return null;
+								
+								const remaining = goal.targetAmount - (goal.allocatedAmount || 0);
+								const progress = ((goal.allocatedAmount || 0) / goal.targetAmount) * 100;
+								
+								return (
+									<div key={alloc.goalId} className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800">
+										<div className="flex justify-between items-start mb-3">
+											<div>
+												<h4 className="font-medium text-gray-800 dark:text-white">{goal.name}</h4>
+												<p className="text-sm text-gray-500 dark:text-gray-400">
+													Priority {goal.priority} • {formatCurrency(remaining, finTrackData.currency)} remaining
+												</p>
+											</div>
+											<div className="text-right">
+												<CalculatorInput
+													value={alloc.amount.toString()}
+													onChange={(e) => handleAllocationChange(alloc.goalId, parseFloat(e.target.value) || 0)}
+													className="w-32 text-right"
+													placeholder="0.00"
+												/>
+											</div>
+										</div>
+										<div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+											<div
+												className="bg-indigo-600 h-2 rounded-full transition-all"
+												style={{ width: `${Math.min(progress, 100)}%` }}
+											></div>
+										</div>
+									</div>
+								);
+							})}
+						</div>
+					</div>
+				) : (
+					<div className="mb-6 p-8 text-center text-gray-500 dark:text-gray-400">
+						<PiggyBank className="h-12 w-12 mx-auto mb-4 opacity-50" />
+						<p>No active savings goals to allocate funds to.</p>
+					</div>
+				)}
+				
+				{/* Action Buttons */}
+				<div className="flex gap-3">
+					<button
+						type="button"
+						onClick={onClose}
+						className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+					>
+						Cancel
+					</button>
+					<button
+						type="button"
+						onClick={handleExecuteAllocation}
+						disabled={!selectedAccount || totalAllocation <= 0 || isProcessing}
+						className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+					>
+						{isProcessing ? (
+							<RefreshCw className="h-4 w-4 animate-spin" />
+						) : (
+							<ArrowRightLeft className="h-4 w-4" />
+						)}
+						Execute Allocation
+					</button>
+				</div>
+			</Card>
+		</div>
+	);
+};
+
+// Add Progress Modal Component
+const AddProgressModal = ({ isOpen, onClose, goal, onSave, currency, onError }) => {
+	const [amount, setAmount] = useState('');
+	
+	useEffect(() => {
+		if (isOpen) {
+			setAmount('');
+		}
+	}, [isOpen]);
+	
+	const handleSubmit = (e) => {
+		e.preventDefault();
+		const progressAmount = parseFloat(amount);
+		
+		if (!amount || progressAmount <= 0) {
+			onError('Please enter a valid amount.');
+			return;
+		}
+		
+		const remaining = goal.targetAmount - (goal.allocatedAmount || 0);
+		if (progressAmount > remaining) {
+			onError(`Amount cannot exceed remaining target of ${formatCurrency(remaining, currency)}.`);
+			return;
+		}
+		
+		const updatedGoal = {
+			...goal,
+			allocatedAmount: (goal.allocatedAmount || 0) + progressAmount,
+			isCompleted: (goal.allocatedAmount || 0) + progressAmount >= goal.targetAmount,
+			completedDate: (goal.allocatedAmount || 0) + progressAmount >= goal.targetAmount 
+				? formatDateForInput(new Date()) : goal.completedDate
+		};
+		
+		onSave(updatedGoal);
+		onClose();
+	};
+	
+	if (!isOpen) return null;
+	
+	const remaining = goal ? goal.targetAmount - (goal.allocatedAmount || 0) : 0;
+	
+	return (
+		<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+			<Card className="w-full max-w-md">
+				<div className="flex justify-between items-center mb-6">
+					<h2 className="text-lg font-semibold text-gray-800 dark:text-white">Add Progress</h2>
+					<button type="button" onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors">
+						<X className="h-6 w-6 text-gray-500 dark:text-gray-400" />
+					</button>
+				</div>
+				
+				{goal && (
+					<div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+						<h3 className="font-medium mb-2 text-gray-800 dark:text-white">{goal.name}</h3>
+						<div className="text-sm text-gray-600 dark:text-gray-400">
+							<p>Current: {formatCurrency(goal.allocatedAmount || 0, currency)}</p>
+							<p>Target: {formatCurrency(goal.targetAmount, currency)}</p>
+							<p>Remaining: {formatCurrency(remaining, currency)}</p>
+						</div>
+					</div>
+				)}
+				
+				<form onSubmit={handleSubmit} className="space-y-4">
+					<div>
+						<label htmlFor="progress-amount" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+							Amount to Add
+						</label>
+						<CalculatorInput
+							id="progress-amount"
+							value={amount}
+							onChange={(e) => setAmount(e.target.value)}
+							placeholder="0.00"
+						/>
+					</div>
+					
+					<div className="flex gap-3">
+						<button
+							type="button"
+							onClick={onClose}
+							className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+						>
+							Cancel
+						</button>
+						<button
+							type="submit"
+							className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+						>
+							Add Progress
+						</button>
+					</div>
+				</form>
+			</Card>
+		</div>
+	);
+};
+
+// --- SAVINGS GOALS COMPONENTS ---
+const SavingsGoalsPage = ({ finTrackData, savingsGoalModalControls }) => {
+	const { savingsGoals, savingsSettings, currency } = finTrackData;
+	const [allocationModalOpen, setAllocationModalOpen] = useState(false);
+	const [progressModalOpen, setProgressModalOpen] = useState(false);
+	const [selectedGoal, setSelectedGoal] = useState(null);
+	const { calculateAvailableSavings, calculateOptimalAllocation } = useSavingsAllocation(finTrackData);
+	
+	const handleOpenProgressModal = (goal) => {
+		setSelectedGoal(goal);
+		setProgressModalOpen(true);
+	};
+	
+	const handleCloseProgressModal = () => {
+		setProgressModalOpen(false);
+		setSelectedGoal(null);
+	};
+	
+	return (
+		<div className="p-4 md:p-6 space-y-6">
+			<SavingsSettingsCard
+				finTrackData={finTrackData}
+				currency={currency}
+			/>
+			
+			<SavingsPredictionCard
+				finTrackData={finTrackData}
+				currency={currency}
+			/>
+			
+			{/* Smart Allocation Section */}
+			{calculateOptimalAllocation.length > 0 && (
+				<Card>
+					<div className="flex justify-between items-start mb-4">
+						<div>
+							<h3 className="text-lg font-semibold">Smart Allocation</h3>
+							<p className="text-sm text-gray-500 dark:text-gray-400">
+								Optimal fund distribution based on your priorities
+							</p>
+						</div>
+						<button
+							type="button"
+							onClick={() => setAllocationModalOpen(true)}
+							className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"
+						>
+							<ArrowRightLeft className="h-4 w-4" />
+							Allocate Funds
+						</button>
+					</div>
+					
+					<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+						<div className="text-center">
+							<p className="text-sm text-gray-500 dark:text-gray-400">Available</p>
+							<p className="text-lg font-semibold text-green-600">
+								{formatCurrency(calculateAvailableSavings.remainingSavings, currency)}
+							</p>
+						</div>
+						<div className="text-center">
+							<p className="text-sm text-gray-500 dark:text-gray-400">Recommended</p>
+							<p className="text-lg font-semibold text-blue-600">
+								{formatCurrency(calculateOptimalAllocation.reduce((sum, a) => sum + a.allocation, 0), currency)}
+							</p>
+						</div>
+						<div className="text-center">
+							<p className="text-sm text-gray-500 dark:text-gray-400">Active Goals</p>
+							<p className="text-lg font-semibold text-indigo-600">
+								{calculateOptimalAllocation.length}
+							</p>
+						</div>
+						<div className="text-center">
+							<p className="text-sm text-gray-500 dark:text-gray-400">Savings Balance</p>
+							<p className="text-lg font-semibold text-purple-600">
+								{formatCurrency(calculateAvailableSavings.totalSavingsBalance, currency)}
+							</p>
+						</div>
+					</div>
+					
+					<div className="space-y-2">
+						<h4 className="font-medium text-sm">Recommended Allocations:</h4>
+						{calculateOptimalAllocation.slice(0, 3).map(alloc => (
+							<div key={alloc.goal.id} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
+								<div className="flex items-center gap-2">
+									<div className="w-2 h-2 bg-indigo-600 rounded-full"></div>
+									<span className="text-sm font-medium">{alloc.goal.name}</span>
+									<span className="text-xs text-gray-500">(Priority {alloc.goal.priority})</span>
+								</div>
+								<span className="text-sm font-semibold">
+									{formatCurrency(alloc.allocation, currency)}
+								</span>
+							</div>
+						))}
+						{calculateOptimalAllocation.length > 3 && (
+							<p className="text-xs text-gray-500 text-center">
+								+{calculateOptimalAllocation.length - 3} more goals...
+							</p>
+						)}
+					</div>
+				</Card>
+			)}
+			{savingsGoals.map((goal) => (
+				<SavingsGoalCard
+					key={goal.id}
+					goal={goal}
+					savingsGoalModalControls={savingsGoalModalControls}
+					onAddProgress={handleOpenProgressModal}
+					currency={currency}
+				/>
+			))}
+			<button
+				type="button"
+				onClick={() => savingsGoalModalControls.open()}
+				className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+			>
+				<Plus size={18} /> Add Savings Goal
+			</button>
+			
+			{/* Allocation Modal */}
+			<SavingsAllocationModal
+				isOpen={allocationModalOpen}
+				onClose={() => setAllocationModalOpen(false)}
+				finTrackData={finTrackData}
+				onError={finTrackData.onError}
+			/>
+			
+			{/* Progress Modal */}
+			<AddProgressModal
+				isOpen={progressModalOpen}
+				onClose={handleCloseProgressModal}
+				goal={selectedGoal}
+				onSave={finTrackData.handleSaveSavingsGoal}
+				currency={currency}
+				onError={finTrackData.onError}
+			/>
+		</div>
+	);
+};
+
+const SavingsPredictionCard = ({ finTrackData, currency }) => {
+	const { transactions, savingsGoals, savingsSettings, accounts } = finTrackData;
+	
+	// Calculate savings prediction based on income and expenses
+	const prediction = useMemo(() => {
+		const today = new Date();
+		const currentMonth = today.getMonth();
+		const currentYear = today.getFullYear();
+		
+		// Get current month's transactions
+		const monthStart = new Date(currentYear, currentMonth, 1);
+		const monthEnd = new Date(currentYear, currentMonth + 1, 0);
+		
+		const monthTransactions = transactions.filter(tx => {
+			const txDate = new Date(tx.date + 'T00:00:00');
+			return txDate >= monthStart && txDate <= monthEnd;
+		});
+		
+		// Calculate actual income and expenses from transactions
+		let actualIncome = 0;
+		let actualExpenses = 0;
+		
+		monthTransactions.forEach(tx => {
+			if (tx.type === 'income' && !tx.category.includes('Balance')) {
+				actualIncome += tx.amount;
+			} else if (tx.type === 'expense' && !tx.category.includes('Balance')) {
+				actualExpenses += tx.amount;
+			} else if (tx.type === 'transfer') {
+				const fromAccount = accounts.find(a => a.id === tx.from);
+				const toAccount = accounts.find(a => a.id === tx.to);
+				if (fromAccount?.type === 'Savings') {
+					actualIncome += tx.amount;
+				}
+				if (toAccount?.type === 'Savings') {
+					actualExpenses += tx.amount;
+				}
+			}
+		});
+		
+		// Use settings for prediction if not using actual data
+		if (savingsSettings && !savingsSettings.useActualData && savingsSettings.incomePerCutoff) {
+			const { incomeMode, incomePerCutoff } = savingsSettings;
+			const monthlyIncome = incomeMode === 'fixed' 
+				? incomePerCutoff.fixed * 2 // 2 cutoffs per month
+				: incomeMode === 'range'
+					? ((incomePerCutoff.min + incomePerCutoff.max) / 2) * 2
+					: actualIncome || 26000; // fallback
+						
+			// Calculate essentials
+			const essentials = savingsSettings.essentialsMode === 'percentage'
+				? monthlyIncome * (savingsSettings.essentialsPercentage / 100)
+				: actualExpenses || 13000; // fallback
+				
+			// Add fixed bills
+			const fixedBills = savingsSettings.fixedBills?.reduce((sum, bill) => sum + bill.amount, 0) || 0;
+			
+			const totalExpenses = essentials + fixedBills;
+			const monthlySavings = monthlyIncome - totalExpenses;
+			
+			return {
+				monthlyIncome,
+				totalExpenses,
+				monthlySavings: Math.max(0, monthlySavings),
+				essentials,
+				fixedBills,
+				isUsingSettings: true,
+				actualIncome,
+				actualExpenses
+			};
+		}
+		
+		// Use actual transaction data
+		const monthlySavings = Math.max(0, actualIncome - actualExpenses);
+		return {
+			monthlyIncome: actualIncome,
+			totalExpenses: actualExpenses,
+			monthlySavings,
+			essentials: actualExpenses * 0.7, // estimate
+			fixedBills: actualExpenses * 0.3, // estimate
+			isUsingSettings: false,
+			actualIncome,
+			actualExpenses
+		};
+	}, [transactions, savingsSettings, accounts]);
+	
+	// Calculate goal predictions
+	const goalPredictions = useMemo(() => {
+		if (prediction.monthlySavings <= 0) return [];
+		
+		return savingsGoals
+			.filter(goal => !goal.isCompleted)
+			.sort((a, b) => a.priority - b.priority)
+			.map((goal, index) => {
+				const remainingAmount = goal.targetAmount - (goal.allocatedAmount || 0);
+				
+				// Simple allocation: divide available savings by number of goals
+				const activeGoals = savingsGoals.filter(g => !g.isCompleted).length;
+				const monthlyAllocation = activeGoals > 0 ? prediction.monthlySavings / activeGoals : 0;
+				
+				const monthsToComplete = monthlyAllocation > 0 ? Math.ceil(remainingAmount / monthlyAllocation) : Infinity;
+				
+				const completionDate = new Date();
+				completionDate.setMonth(completionDate.getMonth() + monthsToComplete);
+				
+				return {
+					...goal,
+					remainingAmount,
+					monthlyAllocation,
+					monthsToComplete: monthsToComplete === Infinity ? '∞' : monthsToComplete,
+					estimatedCompletion: monthsToComplete === Infinity ? null : completionDate
+				};
+			});
+	}, [savingsGoals, prediction]);
+	
+	return (
+		<Card>
+			<div className="flex justify-between items-start mb-6">
+				<h2 className="text-xl font-bold text-gray-800 dark:text-white">
+					Savings Prediction
+				</h2>
+				<div className="text-xs text-gray-500 dark:text-gray-400">
+					{prediction.isUsingSettings ? (
+						<span className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">
+							Using Settings
+						</span>
+					) : (
+						<span className="bg-green-100 dark:bg-green-900 px-2 py-1 rounded">
+							Using Actual Data
+						</span>
+					)}
+				</div>
+			</div>
+			
+			<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+				<div className="text-center">
+					<p className="text-sm text-gray-500 dark:text-gray-400">Monthly Income</p>
+					<p className="text-lg font-semibold text-green-600">
+						{formatCurrency(prediction.monthlyIncome, currency)}
+					</p>
+					{prediction.isUsingSettings && (
+						<p className="text-xs text-gray-400">
+							Actual: {formatCurrency(prediction.actualIncome, currency)}
+						</p>
+					)}
+				</div>
+				<div className="text-center">
+					<p className="text-sm text-gray-500 dark:text-gray-400">Total Expenses</p>
+					<p className="text-lg font-semibold text-red-600">
+						{formatCurrency(prediction.totalExpenses, currency)}
+					</p>
+					{prediction.isUsingSettings && (
+						<p className="text-xs text-gray-400">
+							Actual: {formatCurrency(prediction.actualExpenses, currency)}
+						</p>
+					)}
+				</div>
+				<div className="text-center">
+					<p className="text-sm text-gray-500 dark:text-gray-400">Available Savings</p>
+					<p className="text-lg font-semibold text-blue-600">
+						{formatCurrency(prediction.monthlySavings, currency)}
+					</p>
+				</div>
+				<div className="text-center">
+					<p className="text-sm text-gray-500 dark:text-gray-400">Active Goals</p>
+					<p className="text-lg font-semibold text-indigo-600">
+						{savingsGoals.filter(g => !g.isCompleted).length}
+					</p>
+				</div>
+			</div>
+			
+			{prediction.isUsingSettings && (
+				<div className="text-xs text-gray-500 dark:text-gray-400 text-center border-t pt-4">
+					<p>💡 These calculations use your savings settings. Switch to actual data in Savings Settings for real transaction-based calculations.</p>
+				</div>
+			)}
+			
+			{goalPredictions.length > 0 && (
+				<div>
+					<h3 className="text-lg font-semibold mb-4">Goal Timeline</h3>
+					<div className="space-y-3">
+						{goalPredictions.map((prediction) => (
+							<div key={prediction.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+								<div>
+									<p className="font-medium">{prediction.name}</p>
+									<p className="text-sm text-gray-600 dark:text-gray-400">
+										{formatCurrency(prediction.monthlyAllocation, currency)}/month
+									</p>
+								</div>
+								<div className="text-right">
+									<p className="font-medium">
+										{prediction.monthsToComplete} months
+									</p>
+									{prediction.estimatedCompletion && (
+										<p className="text-sm text-gray-600 dark:text-gray-400">
+											{prediction.estimatedCompletion.toLocaleDateString()}
+										</p>
+									)}
+								</div>
+							</div>
+						))}
+					</div>
+				</div>
+			)}
+		</Card>
+	);
+};
+
+const SavingsSettingsCard = ({ finTrackData, currency }) => {
+	const { savingsSettings, handleUpdateSavingsSettings } = finTrackData;
+	const [isEditing, setIsEditing] = useState(false);
+	const [formData, setFormData] = useState({
+		incomeMode: 'range',
+		incomePerCutoff: {
+			min: 13000,
+			max: 13500,
+			fixed: 13250
+		},
+		essentialsMode: 'percentage',
+		essentialsPercentage: 50,
+		useActualData: false
+	});
+	
+	useEffect(() => {
+		if (savingsSettings) {
+			setFormData({
+				incomeMode: savingsSettings.incomeMode || 'range',
+				incomePerCutoff: savingsSettings.incomePerCutoff || {
+					min: 13000,
+					max: 13500,
+					fixed: 13250
+				},
+				essentialsMode: savingsSettings.essentialsMode || 'percentage',
+				essentialsPercentage: savingsSettings.essentialsPercentage || 50,
+				useActualData: savingsSettings.useActualData || false
+			});
+		}
+	}, [savingsSettings]);
+	
+	const handleSave = () => {
+		const updatedSettings = {
+			...savingsSettings,
+			...formData
+		};
+		handleUpdateSavingsSettings(updatedSettings);
+		setIsEditing(false);
+	};
+	
+	const handleCancel = () => {
+		setIsEditing(false);
+		// Reset form data
+		setFormData({
+			incomeMode: savingsSettings?.incomeMode || 'range',
+			incomePerCutoff: savingsSettings?.incomePerCutoff || {
+				min: 13000,
+				max: 13500,
+				fixed: 13250
+			},
+			essentialsMode: savingsSettings?.essentialsMode || 'percentage',
+			essentialsPercentage: savingsSettings?.essentialsPercentage || 50,
+			useActualData: savingsSettings?.useActualData || false
+		});
+	};
+	
+	const updateFormData = (field, value) => {
+		setFormData(prev => {
+			if (field.includes('.')) {
+				const [parent, child] = field.split('.');
+				return {
+					...prev,
+					[parent]: {
+						...prev[parent],
+						[child]: value
+					}
+				};
+			}
+			return {
+				...prev,
+				[field]: value
+			};
+		});
+	};
+	
+	return (
+		<Card>
+			<div className="flex justify-between items-center mb-4">
+				<h3 className="text-lg font-semibold text-gray-800 dark:text-white">Savings Settings</h3>
+				{!isEditing ? (
+					<button
+						type="button"
+						onClick={() => setIsEditing(true)}
+						className="px-3 py-1 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+					>
+						Edit
+					</button>
+				) : (
+					<div className="flex gap-2">
+						<button
+							type="button"
+							onClick={handleCancel}
+							className="px-3 py-1 text-sm bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+						>
+							Cancel
+						</button>
+						<button
+							type="button"
+							onClick={handleSave}
+							className="px-3 py-1 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+						>
+							Save
+						</button>
+					</div>
+				)}
+			</div>
+			
+			{!isEditing ? (
+				<div className="space-y-3">
+					<div className="flex justify-between items-center">
+						<span className="text-sm text-gray-600 dark:text-gray-400">Data Source:</span>
+						<span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+							{formData.useActualData ? 'Transaction Data' : 'Settings Values'}
+						</span>
+					</div>
+					
+					<div className="flex justify-between items-center">
+						<span className="text-sm text-gray-600 dark:text-gray-400">Income Mode:</span>
+						<span className="text-sm font-medium text-gray-800 dark:text-gray-200 capitalize">{formData.incomeMode}</span>
+					</div>
+					
+					{formData.incomeMode === 'fixed' && (
+						<div className="flex justify-between items-center">
+							<span className="text-sm text-gray-600 dark:text-gray-400">Fixed Income (per cutoff):</span>
+							<span className="text-sm font-medium text-gray-800 dark:text-gray-200">{formatCurrency(formData.incomePerCutoff.fixed, currency)}</span>
+						</div>
+					)}
+					
+					{formData.incomeMode === 'range' && (
+						<div className="flex justify-between items-center">
+							<span className="text-sm text-gray-600 dark:text-gray-400">Income Range (per cutoff):</span>
+							<span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+								{formatCurrency(formData.incomePerCutoff.min, currency)} - {formatCurrency(formData.incomePerCutoff.max, currency)}
+							</span>
+						</div>
+					)}
+					
+					<div className="flex justify-between items-center">
+						<span className="text-sm text-gray-600 dark:text-gray-400">Essential Expenses:</span>
+						<span className="text-sm font-medium text-gray-800 dark:text-gray-200">{formData.essentialsPercentage}% of income</span>
+					</div>
+				</div>
+			) : (
+				<div className="space-y-4">
+					<div>
+						<label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+							<input
+								type="checkbox"
+								checked={formData.useActualData}
+								onChange={(e) => updateFormData('useActualData', e.target.checked)}
+								className="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
+							/>
+							Use actual transaction data instead of settings
+						</label>
+					</div>
+					
+					{!formData.useActualData && (
+						<>
+							<div>
+								<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Income Mode</label>
+								<select
+									value={formData.incomeMode}
+									onChange={(e) => updateFormData('incomeMode', e.target.value)}
+									className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+								>
+									<option value="fixed">Fixed Income</option>
+									<option value="range">Income Range</option>
+									<option value="average">Use Average</option>
+								</select>
+							</div>
+							
+							{formData.incomeMode === 'fixed' && (
+								<div>
+									<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Fixed Income (per cutoff)</label>
+									<CalculatorInput
+										value={formData.incomePerCutoff.fixed.toString()}
+										onChange={(e) => updateFormData('incomePerCutoff.fixed', parseFloat(e.target.value) || 0)}
+										placeholder="0.00"
+									/>
+								</div>
+							)}
+							
+							{formData.incomeMode === 'range' && (
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+									<div>
+										<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Min Income</label>
+										<CalculatorInput
+											value={formData.incomePerCutoff.min.toString()}
+											onChange={(e) => updateFormData('incomePerCutoff.min', parseFloat(e.target.value) || 0)}
+											placeholder="0.00"
+										/>
+									</div>
+									<div>
+										<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Max Income</label>
+										<CalculatorInput
+											value={formData.incomePerCutoff.max.toString()}
+											onChange={(e) => updateFormData('incomePerCutoff.max', parseFloat(e.target.value) || 0)}
+											placeholder="0.00"
+										/>
+									</div>
+								</div>
+							)}
+							
+							<div>
+								<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Essential Expenses (% of income)</label>
+								<input
+									type="range"
+									min="0"
+									max="100"
+									value={formData.essentialsPercentage}
+									onChange={(e) => updateFormData('essentialsPercentage', parseInt(e.target.value))}
+									className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+								/>
+								<div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 mt-1">
+									<span>0%</span>
+									<span className="font-medium text-indigo-600 dark:text-indigo-400">{formData.essentialsPercentage}%</span>
+									<span>100%</span>
+								</div>
+							</div>
+						</>
+					)}
+				</div>
+			)}
+		</Card>
+	);
+};
+
+const SavingsGoalCard = ({ goal, savingsGoalModalControls, onAddProgress, currency }) => {
+	const progress = goal.targetAmount > 0 ? ((goal.allocatedAmount || 0) / goal.targetAmount) * 100 : 0;
+	const remaining = goal.targetAmount - (goal.allocatedAmount || 0);
+	
+	return (
+		<Card>
+			<div className="flex justify-between items-start mb-4">
+				<div>
+					<h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+						{goal.name}
+					</h3>
+					<p className="text-sm text-gray-500 dark:text-gray-400">
+						Priority {goal.priority}
+					</p>
+				</div>
+				<div className="flex gap-1">
+					{!goal.isCompleted && (
+						<button
+							type="button"
+							onClick={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								onAddProgress(goal);
+							}}
+							title="Add Progress"
+							className="p-2 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-full"
+						>
+							<Plus className="w-4 h-4 text-indigo-600" />
+						</button>
+					)}
+					<button
+						type="button"
+						onClick={() => savingsGoalModalControls.edit(goal)}
+						title="Edit Goal"
+						className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+					>
+						<Edit className="w-4 h-4 text-gray-500" />
+					</button>
+					<button
+						type="button"
+						onClick={() => savingsGoalModalControls.delete(goal.id)}
+						title="Delete Goal"
+						className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+					>
+						<Trash2 className="w-4 h-4 text-red-500" />
+					</button>
+				</div>
+			</div>
+			
+			<div className="mb-4">
+				<div className="flex justify-between items-center mb-2">
+					<span className="text-sm font-medium">Progress</span>
+					<span className="text-sm text-gray-600 dark:text-gray-400">
+						{formatCurrency(goal.allocatedAmount || 0, currency)} / {formatCurrency(goal.targetAmount, currency)}
+					</span>
+				</div>
+				<div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+					<div
+						className={`h-3 rounded-full ${
+							goal.isCompleted ? 'bg-green-500' : progress >= 100 ? 'bg-green-500' : 'bg-indigo-600'
+						}`}
+						style={{ width: `${Math.min(progress, 100)}%` }}
+					></div>
+				</div>
+			</div>
+			
+			<div className="space-y-3">
+				<div className="flex justify-between items-center text-sm">
+					<div>
+						<p className="text-gray-600 dark:text-gray-400">Remaining:</p>
+						<p className="font-semibold">{formatCurrency(Math.max(0, remaining), currency)}</p>
+					</div>
+					<div className="text-right">
+						<p className="text-gray-600 dark:text-gray-400">Created:</p>
+						<p className="font-semibold">
+							{new Date(goal.createdDate + 'T00:00:00').toLocaleDateString()}
+						</p>
+					</div>
+					{goal.isCompleted && (
+						<div className="text-right">
+							<p className="text-gray-600 dark:text-gray-400">Completed:</p>
+							<p className="font-semibold text-green-600">
+								{new Date(goal.completedDate + 'T00:00:00').toLocaleDateString()}
+							</p>
+						</div>
+					)}
+				</div>
+				
+				{/* Quick Actions */}
+				{!goal.isCompleted && remaining > 0 && (
+					<div className="flex gap-2 pt-3 border-t dark:border-gray-600">
+						<button
+							type="button"
+							onClick={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								onAddProgress(goal);
+							}}
+							className="flex-1 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-1"
+						>
+							<Plus className="w-4 h-4" />
+							Add Progress
+						</button>
+							{progress >= 80 && (
+								<button
+									type="button"
+									onClick={(e) => {
+										e.preventDefault();
+										e.stopPropagation();
+										const updatedGoal = {
+											...goal,
+											allocatedAmount: goal.targetAmount,
+											isCompleted: true,
+											completedDate: formatDateForInput(new Date())
+										};
+										if (savingsGoalModalControls.save) {
+											savingsGoalModalControls.save(updatedGoal);
+										}
+									}}
+									className="px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 flex items-center justify-center gap-1"
+								>
+									<CheckCircle className="w-4 h-4" />
+									Complete
+								</button>
+							)}
+					</div>
+				)}
+				
+				{goal.isCompleted && (
+					<div className="flex items-center justify-center gap-2 pt-3 border-t dark:border-gray-600 text-green-600">
+						<CheckCircle className="w-5 h-5" />
+						<span className="text-sm font-medium">Goal Completed!</span>
+					</div>
+				)}
+			</div>
+		</Card>
+	);
+};
+
+const SavingsGoalModal = ({ isOpen, onClose, onSave, goalToEdit, onError }) => {
+	const [name, setName] = useState('');
+	const [targetAmount, setTargetAmount] = useState('');
+	const [priority, setPriority] = useState(1);
+	const [allocatedAmount, setAllocatedAmount] = useState('');
+	const [isCompleted, setIsCompleted] = useState(false);
+	const [completedDate, setCompletedDate] = useState('');
+	const isEditMode = !!goalToEdit;
+	
+	useEffect(() => {
+		if (isOpen) {
+			if (isEditMode) {
+				setName(goalToEdit.name);
+				setTargetAmount(goalToEdit.targetAmount.toString());
+				setPriority(goalToEdit.priority);
+				setAllocatedAmount((goalToEdit.allocatedAmount || 0).toString());
+				setIsCompleted(goalToEdit.isCompleted || false);
+				setCompletedDate(goalToEdit.completedDate || '');
+			} else {
+				setName('');
+				setTargetAmount('');
+				setPriority(1);
+				setAllocatedAmount('0');
+				setIsCompleted(false);
+				setCompletedDate('');
+			}
+		}
+	}, [isOpen, isEditMode, goalToEdit]);
+	
+	const handleSubmit = (e) => {
+		e.preventDefault();
+		if (!name.trim()) {
+			onError('Goal name is required.');
+			return;
+		}
+		if (!targetAmount || parseFloat(targetAmount) <= 0) {
+			onError('Please enter a valid target amount.');
+			return;
+		}
+		
+		const newGoal = {
+			id: isEditMode ? goalToEdit.id : `goal-${Date.now()}`,
+			name: name.trim(),
+			targetAmount: parseFloat(targetAmount),
+			priority: parseInt(priority),
+			createdDate: isEditMode ? goalToEdit.createdDate : formatDateForInput(new Date()),
+			allocatedAmount: parseFloat(allocatedAmount) || 0,
+			isCompleted,
+			completedDate: isCompleted && completedDate ? completedDate : (isCompleted ? formatDateForInput(new Date()) : null),
+		};
+		
+		onSave(newGoal);
+		onClose();
+	};
+	
+	if (!isOpen) return null;
+	
+	return (
+		<div
+			className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4"
+			onClick={(e) => {
+				if (e.target === e.currentTarget) onClose();
+			}}
+		>
+			<Card className="w-full max-w-md">
+				<div className="flex justify-between items-center mb-6">
+					<h2 className="text-lg font-semibold text-gray-800 dark:text-white">
+						{isEditMode ? 'Edit' : 'Add'} Savings Goal
+					</h2>
+					<button type="button" onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors">
+						<X className="h-6 w-6 text-gray-500 dark:text-gray-400" />
+					</button>
+				</div>
+				
+				<form onSubmit={handleSubmit} className="space-y-4">
+					<div>
+						<label htmlFor="goal-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+							Goal Name
+						</label>
+						<input
+							id="goal-name"
+							type="text"
+							value={name}
+							onChange={(e) => setName(e.target.value)}
+							className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+							placeholder="e.g., New Laptop, Vacation, Emergency Fund"
+						/>
+					</div>
+					
+					<div>
+						<label htmlFor="target-amount" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+							Target Amount
+						</label>
+						<CalculatorInput
+							id="target-amount"
+							value={targetAmount}
+							onChange={(e) => setTargetAmount(e.target.value)}
+							placeholder="0.00"
+						/>
+					</div>
+					
+					<div>
+						<label htmlFor="priority" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+							Priority (1 = highest)
+						</label>
+						<input
+							id="priority"
+							type="number"
+							value={priority}
+							onChange={(e) => setPriority(parseInt(e.target.value) || 1)}
+							min="1"
+							max="10"
+							className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+						/>
+					</div>
+					
+					<div>
+						<label htmlFor="allocated-amount" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+							Current Amount Saved
+						</label>
+						<CalculatorInput
+							id="allocated-amount"
+							value={allocatedAmount}
+							onChange={(e) => setAllocatedAmount(e.target.value)}
+							placeholder="0.00"
+						/>
+					</div>
+					
+					<div className="flex items-center space-x-2">
+						<input
+							id="completed"
+							type="checkbox"
+							checked={isCompleted}
+							onChange={(e) => setIsCompleted(e.target.checked)}
+							className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
+						/>
+						<label htmlFor="completed" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+							Mark as completed
+						</label>
+					</div>
+					
+					{isCompleted && (
+						<div>
+							<label htmlFor="completed-date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+								Completion Date
+							</label>
+							<input
+								id="completed-date"
+								type="date"
+								value={completedDate}
+								onChange={(e) => setCompletedDate(e.target.value)}
+								className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+							/>
+						</div>
+					)}
+					
+					<button
+						type="submit"
+						className="w-full bg-indigo-600 text-white font-semibold p-3 rounded-lg hover:bg-indigo-700 transition-colors mt-6"
+					>
+						{isEditMode ? 'Save Changes' : 'Add Goal'}
+					</button>
+				</form>
+			</Card>
+		</div>
+	);
+};
+
 // --- PAGES & PAGE-SPECIFIC COMPONENTS ---
 const DashboardPage = ({ finTrackData, txModalControls }) => {
 	const {
@@ -2916,6 +4343,7 @@ const BudgetCard = ({
 };
 const AccountItem = ({
 	account,
+	calculatedBalance,
 	transactions,
 	accountModalControls,
 	currency,
@@ -2993,7 +4421,7 @@ const AccountItem = ({
 					</div>
 					<div className="text-right">
 						<p className="text-lg font-bold text-gray-800 dark:text-gray-100">
-							{formatCurrency(account.balance, currency)}
+							{formatCurrency(calculatedBalance, currency)}
 						</p>
 						<p className="text-xs text-gray-400">
 							<span className="text-green-500">
@@ -3044,7 +4472,7 @@ const AccountItem = ({
 };
 
 const AccountsPage = ({ finTrackData, accountModalControls, navigate }) => {
-	const { accounts, transactions, currency, handleDeleteAccount } =
+	const { accounts, transactions, currency, calculatedData, handleDeleteAccount } =
 		finTrackData;
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
 	const handleDeleteRequest = (accountId) => {
@@ -3067,6 +4495,7 @@ const AccountsPage = ({ finTrackData, accountModalControls, navigate }) => {
 						<AccountItem
 							key={account.id}
 							account={account}
+							calculatedBalance={calculatedData.accountBalances[account.id] || 0}
 							transactions={transactions}
 							accountModalControls={accountModalControls}
 							currency={currency}
@@ -3093,15 +4522,18 @@ const AccountsPage = ({ finTrackData, accountModalControls, navigate }) => {
 	);
 };
 
-const AccountDetailPage = ({ account, finTrackData, txModalControls }) => {
-	const { transactions, accounts, categories, currency } = finTrackData;
-	const [filterPeriod, setFilterPeriod] = useState("monthly");
-	const [referenceDate, setReferenceDate] = useState(new Date());
-	const [filter, setFilter] = useState({
-		startDate: formatDateForInput(getStartOfMonth(new Date())),
-		endDate: formatDateForInput(getEndOfMonth(new Date())),
-		type: "all",
-	});
+	const AccountDetailPage = ({ account, finTrackData, txModalControls }) => {
+		const { transactions, accounts, categories, currency, calculatedData } = finTrackData;
+		const [filterPeriod, setFilterPeriod] = useState("monthly");
+		const [referenceDate, setReferenceDate] = useState(new Date());
+		const [filter, setFilter] = useState({
+			startDate: formatDateForInput(getStartOfMonth(new Date())),
+			endDate: formatDateForInput(getEndOfMonth(new Date())),
+			type: "all",
+		});
+
+		// Get the current calculated balance for this account
+		const currentBalance = calculatedData.accountBalances[account.id] || 0;
 
 	useEffect(() => {
 		if (filterPeriod === "custom") return;
@@ -3245,10 +4677,24 @@ const AccountDetailPage = ({ account, finTrackData, txModalControls }) => {
 	return (
 		<div className="p-4 md:p-6 space-y-6">
 			<Card>
-				<div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+				{/* Current Balance Display */}
+				<div className="text-center mb-6 pb-4 border-b dark:border-gray-700">
+					<h2 className="text-xl md:text-2xl font-bold text-gray-800 dark:text-white mb-1">
+						{account.name}
+					</h2>
+					<p className="text-2xl md:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+						{formatCurrency(currentBalance, currency)}
+					</p>
+					<p className="text-sm text-gray-500 dark:text-gray-400">
+						Current Account Balance
+					</p>
+				</div>
+				
+				{/* Period Activity Summary */}
+				<div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-center">
 					<div>
 						<h3 className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
-							Deposits
+							Period Deposits
 						</h3>
 						<p className="text-base md:text-lg font-semibold text-green-500">
 							{formatCurrency(totalDeposits, currency)}
@@ -3256,7 +4702,7 @@ const AccountDetailPage = ({ account, finTrackData, txModalControls }) => {
 					</div>
 					<div>
 						<h3 className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
-							Withdrawals
+							Period Withdrawals
 						</h3>
 						<p className="text-base md:text-lg font-semibold text-red-500">
 							{formatCurrency(totalWithdrawals, currency)}
@@ -3264,20 +4710,12 @@ const AccountDetailPage = ({ account, finTrackData, txModalControls }) => {
 					</div>
 					<div>
 						<h3 className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
-							Net Total
+							Period Net
 						</h3>
 						<p
 							className={`text-base md:text-lg font-semibold ${netTotal >= 0 ? "text-green-500" : "text-red-500"}`}
 						>
 							{formatCurrency(netTotal, currency)}
-						</p>
-					</div>
-					<div>
-						<h3 className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
-							Balance
-						</h3>
-						<p className="text-base md:text-lg font-semibold">
-							{formatCurrency(account.balance, currency)}
 						</p>
 					</div>
 				</div>
@@ -4389,6 +5827,11 @@ export default function App() {
 		open: false,
 		edit: null,
 	});
+	const [savingsGoalModalState, setSavingsGoalModalState] = useState({
+		open: false,
+		edit: null,
+		delete: null,
+	});
 	const [isDataMgmtOpen, setDataMgmtOpen] = useState(false);
 
 	const [theme, setTheme] = useStickyState("system", "fintrack-theme");
@@ -4576,11 +6019,24 @@ export default function App() {
 		close: closeRecurringModal,
 		edit: openRecurringModal,
 	};
+	const openSavingsGoalModal = (editGoal = null) =>
+		setSavingsGoalModalState({ open: true, edit: editGoal, delete: null });
+	const closeSavingsGoalModal = () =>
+		setSavingsGoalModalState({ open: false, edit: null, delete: null });
+	const savingsGoalModalControls = {
+		open: openSavingsGoalModal,
+		close: closeSavingsGoalModal,
+		edit: openSavingsGoalModal,
+		delete: (goalId) =>
+			setSavingsGoalModalState((prev) => ({ ...prev, delete: goalId })),
+		save: finTrackData.handleSaveSavingsGoal,
+	};
 
 	const pageTitles = {
 		dashboard: "Dashboard",
 		transactions: "Transactions",
 		budgets: "Budgets",
+		savings: "Savings Goals",
 		accounts: "Accounts",
 		settings: "Settings",
 		manageAccounts: "Manage Accounts",
@@ -4603,7 +6059,7 @@ export default function App() {
 		if (finTrackData.isDbLoading)
 			return <div className="p-8 text-center">Loading Database...</div>;
 		const props = {
-			finTrackData: { ...finTrackData, currency, handleDeleteCategory },
+				finTrackData: { ...finTrackData, currency, handleDeleteCategory, onError: handleError },
 			txModalControls,
 			budgetModalControls,
 			accountModalControls,
@@ -4629,6 +6085,8 @@ export default function App() {
 				return <TransactionsPage {...props} />;
 			case "budgets":
 				return <BudgetsPage {...props} />;
+			case "savings":
+				return <SavingsGoalsPage {...props} savingsGoalModalControls={savingsGoalModalControls} />;
 			case "accounts":
 				return <AccountsPage {...props} />;
 			case "settings":
@@ -4750,6 +6208,23 @@ export default function App() {
 				accounts={finTrackData.accounts}
 				categories={finTrackData.categories}
 				onError={handleError}
+			/>
+			<SavingsGoalModal
+				isOpen={savingsGoalModalState.open}
+				onClose={closeSavingsGoalModal}
+				onSave={finTrackData.handleSaveSavingsGoal}
+				goalToEdit={savingsGoalModalState.edit}
+				onError={handleError}
+			/>
+			<ConfirmationModal
+				isOpen={!!savingsGoalModalState.delete}
+				onClose={closeSavingsGoalModal}
+				onConfirm={() => {
+					finTrackData.handleDeleteSavingsGoal(savingsGoalModalState.delete);
+					closeSavingsGoalModal();
+				}}
+				title="Delete Savings Goal"
+				message="Are you sure you want to delete this savings goal?"
 			/>
 			<DataManagementModal
 				isOpen={isDataMgmtOpen}

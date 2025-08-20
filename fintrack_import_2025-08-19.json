@@ -1,0 +1,1307 @@
+{
+  "version": 3,
+  "accounts": [
+    {
+      "id": "acc-gcash",
+      "name": "GCash",
+      "type": "Debit Card",
+      "balance": 0
+    },
+    {
+      "id": "acc-seabank",
+      "name": "Seabank",
+      "type": "Savings",
+      "balance": 0
+    },
+    {
+      "id": "acc-bdo",
+      "name": "BDO",
+      "type": "Savings",
+      "balance": 0
+    },
+    {
+      "id": "acc-bpi",
+      "name": "BPI",
+      "type": "Savings",
+      "balance": 0
+    },
+    {
+      "id": "acc-cash",
+      "name": "Cash",
+      "type": "Cash",
+      "balance": 0
+    },
+    {
+      "id": "acc-bdo-tita",
+      "name": "BDO (tita)",
+      "type": "Savings",
+      "balance": 0
+    },
+    {
+      "id": "acc-gotyme",
+      "name": "GoTyme",
+      "type": "Savings",
+      "balance": 0
+    }
+  ],
+  "transactions": [
+    {
+      "id": "tx-adjustment-1",
+      "accountId": "acc-gcash",
+      "type": "income",
+      "amount": 266,
+      "category": "Balance Adjustment",
+      "date": "2025-08-01",
+      "description": "Initial balance adjustment"
+    },
+    {
+      "id": "tx-adjustment-2",
+      "accountId": "acc-seabank",
+      "type": "income",
+      "amount": 5845,
+      "category": "Balance Adjustment",
+      "date": "2025-08-01",
+      "description": "Initial balance adjustment"
+    },
+    {
+      "id": "tx-adjustment-3",
+      "accountId": "acc-bdo",
+      "type": "income",
+      "amount": 18590,
+      "category": "Balance Adjustment",
+      "date": "2025-08-01",
+      "description": "Initial balance adjustment"
+    },
+    {
+      "id": "tx-adjustment-4",
+      "accountId": "acc-bpi",
+      "type": "income",
+      "amount": 30.56,
+      "category": "Balance Adjustment",
+      "date": "2025-08-01",
+      "description": "Initial balance adjustment"
+    },
+    {
+      "id": "tx-adjustment-5",
+      "accountId": "acc-cash",
+      "type": "income",
+      "amount": 201,
+      "category": "Balance Adjustment",
+      "date": "2025-08-01",
+      "description": "Initial balance adjustment"
+    },
+    {
+      "id": "tx-adjustment-6",
+      "accountId": "acc-bdo-tita",
+      "type": "income",
+      "amount": 11000,
+      "category": "Balance Adjustment",
+      "date": "2025-08-01",
+      "description": "Initial balance adjustment"
+    },
+    {
+      "id": "tx-1724040000000-1",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 10300,
+      "category": "Rent + Utilities",
+      "date": "2025-08-19",
+      "description": "Rent payment Aug."
+    },
+    {
+      "id": "tx-1724040000000-2",
+      "accountId": "acc-seabank",
+      "type": "income",
+      "amount": 5150,
+      "category": "Lent (payment/interest)",
+      "date": "2025-08-19",
+      "description": "Half ni bb rent"
+    },
+    {
+      "id": "tx-1724040000000-3",
+      "accountId": "acc-seabank",
+      "type": "income",
+      "amount": 844,
+      "category": "Lent (payment/interest)",
+      "date": "2025-08-19",
+      "description": "Half ni bb ( paid ) water dispenser at nook"
+    },
+    {
+      "id": "tx-1724040000000-4",
+      "type": "transfer",
+      "from": "acc-seabank",
+      "to": "acc-gcash",
+      "amount": 300,
+      "date": "2025-08-19",
+      "description": "Transfer"
+    },
+    {
+      "id": "tx-1724040000000-5",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 55,
+      "category": "Transport",
+      "date": "2025-08-19",
+      "description": ""
+    },
+    {
+      "id": "tx-1723953600000-6",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 55,
+      "category": "Transport",
+      "date": "2025-08-18",
+      "description": ""
+    },
+    {
+      "id": "tx-1723953600000-7",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 330,
+      "category": "Other",
+      "date": "2025-08-18",
+      "description": ""
+    },
+    {
+      "id": "tx-1723953600000-8",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 60,
+      "category": "Food",
+      "date": "2025-08-18",
+      "description": ""
+    },
+    {
+      "id": "tx-1723953600000-9",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 200,
+      "category": "Food",
+      "date": "2025-08-18",
+      "description": ""
+    },
+    {
+      "id": "tx-1723867200000-10",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 346,
+      "category": "Personal Care",
+      "date": "2025-08-17",
+      "description": "Berroca 15s"
+    },
+    {
+      "id": "tx-1723867200000-11",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 110,
+      "category": "Food",
+      "date": "2025-08-17",
+      "description": "Bigas 55/kg"
+    },
+    {
+      "id": "tx-1723867200000-12",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 551,
+      "category": "Other",
+      "date": "2025-08-17",
+      "description": "Raspberry pi PSU"
+    },
+    {
+      "id": "tx-1723867200000-13",
+      "accountId": "acc-gcash",
+      "type": "income",
+      "amount": 370,
+      "category": "Balance Adjustment",
+      "date": "2025-08-17",
+      "description": "Difference"
+    },
+    {
+      "id": "tx-1723867200000-14",
+      "type": "transfer",
+      "from": "acc-seabank",
+      "to": "acc-cash",
+      "amount": 500,
+      "date": "2025-08-17",
+      "description": "Transfer"
+    },
+    {
+      "id": "tx-1723867200000-15",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 193,
+      "category": "Other",
+      "date": "2025-08-17",
+      "description": "Ace hardware"
+    },
+    {
+      "id": "tx-1723867200000-16",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 546,
+      "category": "Mi amore",
+      "date": "2025-08-17",
+      "description": "Sukiyaki"
+    },
+    {
+      "id": "tx-1723867200000-17",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 101,
+      "category": "Transport",
+      "date": "2025-08-17",
+      "description": ""
+    },
+    {
+      "id": "tx-1723867200000-18",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 189,
+      "category": "Mi amore",
+      "date": "2025-08-17",
+      "description": "Unlce johns"
+    },
+    {
+      "id": "tx-1723867200000-19",
+      "type": "transfer",
+      "from": "acc-seabank",
+      "to": "acc-gcash",
+      "amount": 500,
+      "date": "2025-08-17",
+      "description": "Transfer"
+    },
+    {
+      "id": "tx-1723867200000-20",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 271,
+      "category": "Other",
+      "date": "2025-08-17",
+      "description": "Weighing scale"
+    },
+    {
+      "id": "tx-1723867200000-21",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 686,
+      "category": "Other",
+      "date": "2025-08-17",
+      "description": "Ps4 controller"
+    },
+    {
+      "id": "tx-1723867200000-22",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 302,
+      "category": "Transport",
+      "date": "2025-08-17",
+      "description": ""
+    },
+    {
+      "id": "tx-1723867200000-23",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 60,
+      "category": "Food",
+      "date": "2025-08-17",
+      "description": ""
+    },
+    {
+      "id": "tx-1723867200000-24",
+      "accountId": "acc-bpi",
+      "type": "income",
+      "amount": 43.45,
+      "category": "Balance Adjustment",
+      "date": "2025-08-17",
+      "description": "Difference"
+    },
+    {
+      "id": "tx-1723867200000-25",
+      "type": "transfer",
+      "from": "acc-seabank",
+      "to": "acc-gcash",
+      "amount": 1000,
+      "date": "2025-08-17",
+      "description": "Transfer"
+    },
+    {
+      "id": "tx-1723867200000-26",
+      "type": "transfer",
+      "from": "acc-bpi",
+      "to": "acc-seabank",
+      "amount": 18188,
+      "date": "2025-08-17",
+      "description": "Transfer"
+    },
+    {
+      "id": "tx-1723780800000-27",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 323,
+      "category": "Food",
+      "date": "2025-08-16",
+      "description": "Mushroom"
+    },
+    {
+      "id": "tx-1723780800000-28",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 350,
+      "category": "Load/Data",
+      "date": "2025-08-16",
+      "description": "Kiq"
+    },
+    {
+      "id": "tx-1723694400000-29",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 452,
+      "category": "Food",
+      "date": "2025-08-15",
+      "description": "Ikea dinner"
+    },
+    {
+      "id": "tx-1723694400000-30",
+      "accountId": "acc-bpi",
+      "type": "expense",
+      "amount": 159,
+      "category": "Food",
+      "date": "2025-08-15",
+      "description": "Jollibee breakfast"
+    },
+    {
+      "id": "tx-1723694400000-31",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 172,
+      "category": "Transport",
+      "date": "2025-08-15",
+      "description": "Joyride"
+    },
+    {
+      "id": "tx-1723694400000-32",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 208,
+      "category": "Other",
+      "date": "2025-08-15",
+      "description": "Ikea Stuff"
+    },
+    {
+      "id": "tx-1723694400000-33",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 146,
+      "category": "Transport",
+      "date": "2025-08-15",
+      "description": ""
+    },
+    {
+      "id": "tx-1723694400000-34",
+      "accountId": "acc-bpi",
+      "type": "expense",
+      "amount": 1160,
+      "category": "Shopping",
+      "date": "2025-08-15",
+      "description": "Iphone case"
+    },
+    {
+      "id": "tx-1723694400000-35",
+      "accountId": "acc-bpi",
+      "type": "expense",
+      "amount": 648,
+      "category": "Other",
+      "date": "2025-08-15",
+      "description": "Cranberries etc"
+    },
+    {
+      "id": "tx-1723694400000-36",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 407,
+      "category": "Other",
+      "date": "2025-08-15",
+      "description": "Payong"
+    },
+    {
+      "id": "tx-1723694400000-37",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 1252,
+      "category": "Other",
+      "date": "2025-08-15",
+      "description": "Hati ni bb"
+    },
+    {
+      "id": "tx-1723608000000-38",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 462,
+      "category": "Transport",
+      "date": "2025-08-14",
+      "description": "Indrive circuit to rosario boutique"
+    },
+    {
+      "id": "tx-1723608000000-39",
+      "accountId": "acc-bpi",
+      "type": "expense",
+      "amount": 3336.45,
+      "category": "Other",
+      "date": "2025-08-14",
+      "description": "SnR"
+    },
+    {
+      "id": "tx-1723608000000-40",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 234,
+      "category": "Transport",
+      "date": "2025-08-14",
+      "description": ""
+    },
+    {
+      "id": "tx-1723608000000-41",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 174,
+      "category": "Other",
+      "date": "2025-08-14",
+      "description": "Japan homes flour container"
+    },
+    {
+      "id": "tx-1723608000000-42",
+      "accountId": "acc-bpi",
+      "type": "expense",
+      "amount": 278,
+      "category": "Other",
+      "date": "2025-08-14",
+      "description": "Drill-bit & shoe cleaner"
+    },
+    {
+      "id": "tx-1723608000000-43",
+      "accountId": "acc-bpi",
+      "type": "expense",
+      "amount": 498,
+      "category": "Personal Care",
+      "date": "2025-08-14",
+      "description": "Ayala malls circuit"
+    },
+    {
+      "id": "tx-1723608000000-44",
+      "accountId": "acc-bpi",
+      "type": "expense",
+      "amount": 1398,
+      "category": "Mi amore",
+      "date": "2025-08-14",
+      "description": "Unli"
+    },
+    {
+      "id": "tx-1723608000000-45",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 20,
+      "category": "Food",
+      "date": "2025-08-14",
+      "description": "Buko juice"
+    },
+    {
+      "id": "tx-1723608000000-46",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 480,
+      "category": "Other",
+      "date": "2025-08-14",
+      "description": "Water container plus + alkaline and mineral"
+    },
+    {
+      "id": "tx-1723521600000-47",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 60,
+      "category": "Mi amore",
+      "date": "2025-08-13",
+      "description": ""
+    },
+    {
+      "id": "tx-1723521600000-48",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 429,
+      "category": "Other",
+      "date": "2025-08-13",
+      "description": "Water dispenser"
+    },
+    {
+      "id": "tx-1723521600000-49",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 405,
+      "category": "Food",
+      "date": "2025-08-13",
+      "description": ""
+    },
+    {
+      "id": "tx-1723521600000-50",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 2118,
+      "category": "Other",
+      "date": "2025-08-13",
+      "description": ""
+    },
+    {
+      "id": "tx-1723521600000-51",
+      "type": "transfer",
+      "from": "acc-bdo",
+      "to": "acc-seabank",
+      "amount": 3000,
+      "date": "2025-08-13",
+      "description": "Malou Aug 9 interest payment"
+    },
+    {
+      "id": "tx-1723521600000-52",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 420,
+      "category": "Other",
+      "date": "2025-08-13",
+      "description": "Movie"
+    },
+    {
+      "id": "tx-1723521600000-53",
+      "type": "transfer",
+      "from": "acc-bpi",
+      "to": "acc-cash",
+      "amount": 500,
+      "date": "2025-08-13",
+      "description": "Transfer"
+    },
+    {
+      "id": "tx-1723521600000-54",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 93,
+      "category": "Balance Correction",
+      "date": "2025-08-13",
+      "description": "Difference"
+    },
+    {
+      "id": "tx-1723521600000-55",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 65,
+      "category": "Transport",
+      "date": "2025-08-13",
+      "description": "Moveit"
+    },
+    {
+      "id": "tx-1723521600000-56",
+      "type": "transfer",
+      "from": "acc-seabank",
+      "to": "acc-gcash",
+      "amount": 1000,
+      "date": "2025-08-13",
+      "description": "Transfer"
+    },
+    {
+      "id": "tx-1723521600000-57",
+      "type": "transfer",
+      "from": "acc-bpi",
+      "to": "acc-seabank",
+      "amount": 10000,
+      "date": "2025-08-13",
+      "description": "Transfer"
+    },
+    {
+      "id": "tx-1723521600000-58",
+      "accountId": "acc-bpi",
+      "type": "expense",
+      "amount": 305,
+      "category": "Food",
+      "date": "2025-08-13",
+      "description": "Randys"
+    },
+    {
+      "id": "tx-1723521600000-59",
+      "accountId": "acc-bdo",
+      "type": "expense",
+      "amount": 1507,
+      "category": "Balance Correction",
+      "date": "2025-08-13",
+      "description": "Difference"
+    },
+    {
+      "id": "tx-1723521600000-60",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 5482,
+      "category": "Balance Correction",
+      "date": "2025-08-13",
+      "description": "Difference"
+    },
+    {
+      "id": "tx-1723521600000-61",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 3547,
+      "category": "Balance Correction",
+      "date": "2025-08-13",
+      "description": "Difference"
+    },
+    {
+      "id": "tx-1723521600000-62",
+      "accountId": "acc-bpi",
+      "type": "income",
+      "amount": 36396.44,
+      "category": "Balance Adjustment",
+      "date": "2025-08-13",
+      "description": "Difference"
+    },
+    {
+      "id": "tx-1723176000000-63",
+      "accountId": "acc-gcash",
+      "type": "income",
+      "amount": 3000,
+      "category": "Lent (payment/interest)",
+      "date": "2025-08-09",
+      "description": ""
+    },
+    {
+      "id": "tx-1722225600000-64",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 344.5,
+      "category": "Balance Correction",
+      "date": "2025-07-29",
+      "description": "Difference"
+    },
+    {
+      "id": "tx-1722225600000-65",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 21,
+      "category": "Balance Correction",
+      "date": "2025-07-29",
+      "description": "Difference"
+    },
+    {
+      "id": "tx-1722225600000-66",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 2362,
+      "category": "Other",
+      "date": "2025-07-29",
+      "description": ""
+    },
+    {
+      "id": "tx-1722139200000-67",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 4811,
+      "category": "Other",
+      "date": "2025-07-28",
+      "description": ""
+    },
+    {
+      "id": "tx-1722139200000-68",
+      "type": "transfer",
+      "from": "acc-bpi",
+      "to": "acc-seabank",
+      "amount": 13000,
+      "date": "2025-07-28",
+      "description": "Transfer"
+    },
+    {
+      "id": "tx-1722139200000-69",
+      "accountId": "acc-bpi",
+      "type": "income",
+      "amount": 13000,
+      "category": "Salary",
+      "date": "2025-07-28",
+      "description": ""
+    },
+    {
+      "id": "tx-1722139200000-70",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 45,
+      "category": "Food",
+      "date": "2025-07-28",
+      "description": ""
+    },
+    {
+      "id": "tx-1722139200000-71",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 73,
+      "category": "Food",
+      "date": "2025-07-28",
+      "description": ""
+    },
+    {
+      "id": "tx-1722052800000-72",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 335,
+      "category": "Food",
+      "date": "2025-07-27",
+      "description": ""
+    },
+    {
+      "id": "tx-1722052800000-73",
+      "accountId": "acc-bdo",
+      "type": "expense",
+      "amount": 10,
+      "category": "None",
+      "date": "2025-07-27",
+      "description": "BDO → GCash"
+    },
+    {
+      "id": "tx-1722052800000-74",
+      "type": "transfer",
+      "from": "acc-bdo",
+      "to": "acc-gcash",
+      "amount": 1000,
+      "date": "2025-07-27",
+      "description": "Transfer"
+    },
+    {
+      "id": "tx-1721966400000-75",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 130,
+      "category": "Food",
+      "date": "2025-07-26",
+      "description": ""
+    },
+    {
+      "id": "tx-1721966400000-76",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 50,
+      "category": "Load/Data",
+      "date": "2025-07-26",
+      "description": ""
+    },
+    {
+      "id": "tx-1721880000000-77",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 148,
+      "category": "Food",
+      "date": "2025-07-25",
+      "description": ""
+    },
+    {
+      "id": "tx-1721793600000-78",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 53,
+      "category": "Food",
+      "date": "2025-07-24",
+      "description": ""
+    },
+    {
+      "id": "tx-1721793600000-79",
+      "type": "transfer",
+      "from": "acc-seabank",
+      "to": "acc-gcash",
+      "amount": 382,
+      "date": "2025-07-24",
+      "description": "Transfer"
+    },
+    {
+      "id": "tx-1721793600000-80",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 50,
+      "category": "Load/Data",
+      "date": "2025-07-24",
+      "description": ""
+    },
+    {
+      "id": "tx-1721707200000-81",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 72,
+      "category": "Transport",
+      "date": "2025-07-23",
+      "description": ""
+    },
+    {
+      "id": "tx-1721707200000-82",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 20,
+      "category": "Food",
+      "date": "2025-07-23",
+      "description": ""
+    },
+    {
+      "id": "tx-1721707200000-83",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 40,
+      "category": "Food",
+      "date": "2025-07-23",
+      "description": ""
+    },
+    {
+      "id": "tx-1721707200000-84",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 75,
+      "category": "Transport",
+      "date": "2025-07-23",
+      "description": ""
+    },
+    {
+      "id": "tx-1721707200000-85",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 110,
+      "category": "Food",
+      "date": "2025-07-23",
+      "description": ""
+    },
+    {
+      "id": "tx-1721620800000-86",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 99,
+      "category": "Balance Correction",
+      "date": "2025-07-22",
+      "description": "Difference"
+    },
+    {
+      "id": "tx-1721620800000-87",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 89,
+      "category": "Food",
+      "date": "2025-07-22",
+      "description": ""
+    },
+    {
+      "id": "tx-1721620800000-88",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 50,
+      "category": "Transport",
+      "date": "2025-07-22",
+      "description": ""
+    },
+    {
+      "id": "tx-1721620800000-89",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 40,
+      "category": "Food",
+      "date": "2025-07-22",
+      "description": ""
+    },
+    {
+      "id": "tx-1721620800000-90",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 65,
+      "category": "Transport",
+      "date": "2025-07-22",
+      "description": ""
+    },
+    {
+      "id": "tx-1721620800000-91",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 85,
+      "category": "Food",
+      "date": "2025-07-22",
+      "description": ""
+    },
+    {
+      "id": "tx-1721620800000-92",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 30,
+      "category": "Food",
+      "date": "2025-07-22",
+      "description": ""
+    },
+    {
+      "id": "tx-1721620800000-93",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 45,
+      "category": "Transport",
+      "date": "2025-07-22",
+      "description": ""
+    },
+    {
+      "id": "tx-1721620800000-94",
+      "type": "transfer",
+      "from": "acc-seabank",
+      "to": "acc-gcash",
+      "amount": 500,
+      "date": "2025-07-22",
+      "description": "Transfer"
+    },
+    {
+      "id": "tx-1721534400000-95",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 157,
+      "category": "Food",
+      "date": "2025-07-21",
+      "description": ""
+    },
+    {
+      "id": "tx-1721534400000-96",
+      "accountId": "acc-seabank",
+      "type": "expense",
+      "amount": 12000,
+      "category": "Rent + Utilities",
+      "date": "2025-07-21",
+      "description": "Initial payment apartment"
+    },
+    {
+      "id": "tx-1721534400000-97",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 165,
+      "category": "Laundry",
+      "date": "2025-07-21",
+      "description": ""
+    },
+    {
+      "id": "tx-1721534400000-98",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 45,
+      "category": "Transport",
+      "date": "2025-07-21",
+      "description": ""
+    },
+    {
+      "id": "tx-1721534400000-99",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 50,
+      "category": "Food",
+      "date": "2025-07-21",
+      "description": ""
+    },
+    {
+      "id": "tx-1721534400000-100",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 50,
+      "category": "Food",
+      "date": "2025-07-21",
+      "description": ""
+    },
+    {
+      "id": "tx-1721448000000-101",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 163,
+      "category": "Food",
+      "date": "2025-07-20",
+      "description": ""
+    },
+    {
+      "id": "tx-1721448000000-102",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 45,
+      "category": "Transport",
+      "date": "2025-07-20",
+      "description": ""
+    },
+    {
+      "id": "tx-1721448000000-103",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 117,
+      "category": "Transport",
+      "date": "2025-07-20",
+      "description": ""
+    },
+    {
+      "id": "tx-1721448000000-104",
+      "type": "transfer",
+      "from": "acc-seabank",
+      "to": "acc-gcash",
+      "amount": 400,
+      "date": "2025-07-20",
+      "description": "Transfer"
+    },
+    {
+      "id": "tx-1721448000000-105",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 200,
+      "category": "Other",
+      "date": "2025-07-20",
+      "description": ""
+    },
+    {
+      "id": "tx-1721361600000-106",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 28,
+      "category": "Food",
+      "date": "2025-07-19",
+      "description": "Coffee/snacks"
+    },
+    {
+      "id": "tx-1721275200000-107",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 20,
+      "category": "Balance Correction",
+      "date": "2025-07-18",
+      "description": "Difference"
+    },
+    {
+      "id": "tx-1721275200000-108",
+      "accountId": "acc-seabank",
+      "type": "income",
+      "amount": 10,
+      "category": "Balance Adjustment",
+      "date": "2025-07-18",
+      "description": "Difference"
+    },
+    {
+      "id": "tx-1721275200000-109",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 118,
+      "category": "Balance Correction",
+      "date": "2025-07-18",
+      "description": "Difference"
+    },
+    {
+      "id": "tx-1721275200000-110",
+      "accountId": "acc-seabank",
+      "type": "income",
+      "amount": 3083.5,
+      "category": "Other",
+      "date": "2025-07-18",
+      "description": "Sir Kevin Remaining Bal."
+    },
+    {
+      "id": "tx-1721275200000-111",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 117,
+      "category": "Transport",
+      "date": "2025-07-18",
+      "description": ""
+    },
+    {
+      "id": "tx-1721275200000-112",
+      "type": "transfer",
+      "from": "acc-seabank",
+      "to": "acc-cash",
+      "amount": 1000,
+      "date": "2025-07-18",
+      "description": "Transfer"
+    },
+    {
+      "id": "tx-1721275200000-113",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 100,
+      "category": "Mi amore",
+      "date": "2025-07-18",
+      "description": ""
+    },
+    {
+      "id": "tx-1721275200000-114",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 100,
+      "category": "Food",
+      "date": "2025-07-18",
+      "description": ""
+    },
+    {
+      "id": "tx-1721275200000-115",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 82,
+      "category": "Transport",
+      "date": "2025-07-18",
+      "description": ""
+    },
+    {
+      "id": "tx-1721275200000-116",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 150,
+      "category": "Food",
+      "date": "2025-07-18",
+      "description": ""
+    },
+    {
+      "id": "tx-1721275200000-117",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 199,
+      "category": "Load/Data",
+      "date": "2025-07-18",
+      "description": ""
+    },
+    {
+      "id": "tx-1721275200000-118",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 30,
+      "category": "Food",
+      "date": "2025-07-18",
+      "description": ""
+    },
+    {
+      "id": "tx-1721275200000-119",
+      "accountId": "acc-gcash",
+      "type": "expense",
+      "amount": 60,
+      "category": "Food",
+      "date": "2025-07-18",
+      "description": ""
+    },
+    {
+      "id": "tx-1721275200000-120",
+      "type": "transfer",
+      "from": "acc-seabank",
+      "to": "acc-gcash",
+      "amount": 500,
+      "date": "2025-07-18",
+      "description": "Transfer"
+    },
+    {
+      "id": "tx-1721275200000-121",
+      "accountId": "acc-cash",
+      "type": "expense",
+      "amount": 45,
+      "category": "Transport",
+      "date": "2025-07-18",
+      "description": ""
+    }
+  ],
+  "budgets": [
+    {
+      "id": "bud-1",
+      "name": "Monthly Expenses August 2025",
+      "period": "Monthly",
+      "startDate": "2025-08-01",
+      "endDate": "2025-08-31",
+      "categories": {
+        "Food": 8000,
+        "Transport": 3000,
+        "Mi amore": 4000,
+        "Shopping": 3000,
+        "Laundry": 500,
+        "Personal Care": 1000,
+        "Load/Data": 1000,
+        "Rent + Utilities": 15000,
+        "Other": 5000
+      },
+      "notificationThreshold": 0.8
+    }
+  ],
+  "categories": {
+    "expense": {
+      "Food": {
+        "icon": "Utensils",
+        "color": "#EF4444",
+        "type": "icon"
+      },
+      "Transport": {
+        "icon": "Car",
+        "color": "#3B82F6",
+        "type": "icon"
+      },
+      "Mi amore": {
+        "icon": "Heart",
+        "color": "#EC4899",
+        "type": "icon"
+      },
+      "Shopping": {
+        "icon": "ShoppingCart",
+        "color": "#8B5CF6",
+        "type": "icon"
+      },
+      "Laundry": {
+        "icon": "Shirt",
+        "color": "#10B981",
+        "type": "icon"
+      },
+      "Personal Care": {
+        "icon": "Smile",
+        "color": "#F59E0B",
+        "type": "icon"
+      },
+      "Load/Data": {
+        "icon": "Phone",
+        "color": "#06B6D4",
+        "type": "icon"
+      },
+      "Rent + Utilities": {
+        "icon": "HomeIcon",
+        "color": "#059669",
+        "type": "icon"
+      },
+      "Other": {
+        "icon": "Receipt",
+        "color": "#6B7280",
+        "type": "icon"
+      },
+      "Lent": {
+        "icon": "DollarSign",
+        "color": "#F59E0B",
+        "type": "icon"
+      },
+      "None": {
+        "icon": "Receipt",
+        "color": "#6B7280",
+        "type": "icon"
+      }
+    },
+    "income": {
+      "Salary": {
+        "icon": "Briefcase",
+        "color": "#22C55E",
+        "type": "icon"
+      },
+      "Lent (payment/interest)": {
+        "icon": "Coins",
+        "color": "#14B8A6",
+        "type": "icon"
+      },
+      "Other": {
+        "icon": "Gift",
+        "color": "#EC4899",
+        "type": "icon"
+      }
+    },
+    "special": {
+      "Balance Correction": {
+        "icon": "PiggyBank",
+        "color": "#64748B",
+        "isProtected": true,
+        "type": "icon"
+      },
+      "Balance Adjustment": {
+        "icon": "PiggyBank",
+        "color": "#64748B",
+        "isProtected": true,
+        "type": "icon"
+      }
+    }
+  },
+  "recurringTransactions": [],
+  "appSettings": [],
+  "savingsGoals": [],
+  "savingsSettings": []
+}
